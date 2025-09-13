@@ -42,6 +42,9 @@ def main():
 
             # --- Mouse handling ---
             elif event.type == pygame.MOUSEBUTTONDOWN:
+                if game.end:
+                    game = TFTGame()
+                    game.add_to_log("Game reset! TFT Chess Battle restarted!")
                 if event.button == 1:  # Left click
                     mouse_x, mouse_y = event.pos
                     # First try drag from reserve
@@ -66,6 +69,9 @@ def main():
 
             # --- Keyboard handling ---
             elif event.type == pygame.KEYDOWN:
+                if game.end:
+                    game = TFTGame()
+                    game.add_to_log("Game reset! TFT Chess Battle restarted!")
                 if event.key == pygame.K_SPACE and game.selected_piece and game.phase == GamePhase.BATTLE:
                     game.toggle_action_mode()
                 elif event.key == pygame.K_b and game.phase in [GamePhase.SETUP, GamePhase.SHOP]:
