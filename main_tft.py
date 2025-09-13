@@ -1,5 +1,6 @@
 import pygame
 import sys
+from piece import Color
 from tft_game import TFTGame, GamePhase
 
 def main():
@@ -43,13 +44,15 @@ def main():
             # --- Mouse handling ---
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 if game.end:
-                    game = TFTGame()
+                    screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
+                    SCREEN_WIDTH = pygame.display.Info().current_w
+                    SCREEN_HEIGHT = pygame.display.Info().current_h
+                    game = TFTGame(screen_width=SCREEN_WIDTH, screen_height=SCREEN_HEIGHT)
                     game.add_to_log("Game reset! TFT Chess Battle restarted!")
                 if event.button == 1:  # Left click
                     mouse_x, mouse_y = event.pos
                     # First try drag from reserve
                     game.handle_mouse_down(mouse_x, mouse_y)
-
                     # If not dragging, treat it as a normal click (shop/board/etc.)
                     if not game.dragging_piece:
                         game.handle_click(mouse_x, mouse_y)
@@ -60,12 +63,15 @@ def main():
 
             elif event.type == pygame.MOUSEBUTTONUP:
                 if event.button == 1:  # Left click released
+                    
                     mouse_x, mouse_y = event.pos
                     if game.dragging_piece:
+                        
                         game.handle_mouse_up(mouse_x, mouse_y)
                     else:
                         # This ensures clicks still register properly
                         game.handle_click(mouse_x, mouse_y)
+                    
 
             # --- Keyboard handling ---
             elif event.type == pygame.KEYDOWN:
@@ -78,11 +84,10 @@ def main():
                     game.start_battle_phase()
                 elif event.key == pygame.K_n and game.phase == GamePhase.END_ROUND:
                     game.start_next_round()
-                elif event.key == pygame.K_e and not game.battle_ended and game.phase == GamePhase.BATTLE:
-                    game.end_battle_phase()
                 elif event.key == pygame.K_r:  # Reset game
-                    game = TFTGame()
-                    game.add_to_log("Game reset! TFT Chess Battle restarted!")
+                    if not game.end:
+                        game = TFTGame()
+                        game.add_to_log("Game reset! TFT Chess Battle restarted!")
                 elif event.key == pygame.K_ESCAPE:
                     running = False
 

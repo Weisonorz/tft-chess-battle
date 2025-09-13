@@ -55,6 +55,7 @@ class TFTGame:
         self.dragging_from_reserve = False
         self.drag_offset_x = 0
         self.drag_offset_y = 0
+        self.actions_taken = {Color.WHITE: False, Color.BLACK: False}
 
         # Combat animation state
         self.combat_anim = None  # None or dict with attacker, defender, start_time, type
@@ -128,7 +129,8 @@ class TFTGame:
         # Load card icons (use placeholder if missing)
         card_icon_files = {
             CardType.ARROW_VOLLEY: "arrow_volley.png",
-            CardType.DISARM: "disarm.png"
+            CardType.DISARM: "disarm.png",
+            CardType.REDEMPTION: "redemption.png"
         }
         for card_type, filename in card_icon_files.items():
             try:
@@ -200,9 +202,10 @@ class TFTGame:
                 # Card (30%)
                 arrow_card = Card(CardType.ARROW_VOLLEY, True, "Hackathon_image/arrow_volley.png", "Arrow Volley", 3)
                 disarm_card = Card(CardType.DISARM, False, "Hackathon_image/disarm.png", "Disarm", 3)
+                redemption_card = Card(CardType.REDEMPTION, True, "Hackathon_image/redemption.png", "Redemption", 3)
                 # Randomly pick one card
-                wc = random.choice([arrow_card, disarm_card])
-                bc = random.choice([arrow_card, disarm_card])
+                wc = random.choice([arrow_card, disarm_card, redemption_card])
+                bc = random.choice([arrow_card, disarm_card, redemption_card])
                 self.white_shop_items.append(wc)
                 self.black_shop_items.append(bc)
             else:
@@ -250,9 +253,12 @@ class TFTGame:
             else:
                 self.black_coins -= cost
             # Immediate effect
-            if item.immediate and item.card_type == CardType.ARROW_VOLLEY:
+            if item.immediate:
+                if item.card_type == CardType.ARROW_VOLLEY:
                 # Arrow Volley: use card's effect logic
-                item.apply_effect(self, player)
+                    item.apply_effect(self, player)
+                elif item.card_type == CardType.REDEMPTION:
+                    item.apply_effect(self, player)
             elif not item.immediate and item.card_type == CardType.DISARM:
                 # Disarm: add to inventory
                 if player == Color.WHITE:
@@ -343,7 +349,8 @@ class TFTGame:
         self.black_coins += 1
         
         self.add_to_log(f"Round {self.round_number} ended! +1 coin to both players")
-
+        if not self.end:
+            self.start_next_round()
 
     def end_game(self):
         """End the game"""
@@ -420,11 +427,9 @@ class TFTGame:
         """Try to deploy piece or return to reserve"""
         if not self.dragging_piece:
             return
-
+        player = self.dragging_piece.color
         # Try deploying to board
         row, col = self.board.get_cell_from_mouse(mouse_x, mouse_y)
-        player = self.dragging_piece.color
-
         if self.try_deploy_to_position(player, self.dragging_index, row, col):
             self.add_to_log(f"{player.value.title()} deployed {self.dragging_piece.piece_type.value.title()} to {chr(ord('a')+col)}{8-row}")
         else:
@@ -435,6 +440,8 @@ class TFTGame:
         self.dragging_piece = None
         self.dragging_from_reserve = False
         self.dragging_index = None
+        
+
             
     # Add methods from original game for compatibility
     def handle_click(self, mouse_x: int, mouse_y: int):
@@ -649,6 +656,8 @@ class TFTGame:
         
     def make_move(self, from_row: int, from_col: int, to_row: int, to_col: int):
         """Move a piece"""
+        
+
         moving_piece = self.board.get_piece_at(from_row, from_col)
         
         if not moving_piece or not moving_piece.is_alive():
@@ -659,12 +668,16 @@ class TFTGame:
         if target_piece is None:  # Only move to empty squares
             self.board.move_piece(from_row, from_col, to_row, to_col)
             
+        self.actions_taken[self.current_player] = True
+        if all(self.actions_taken.values()):
+            self.end_battle_phase()
         self.deselect_piece()
         self.switch_player()
         self.check_battle_end()
     
     def make_attack(self, attacker_row: int, attacker_col: int, target_row: int, target_col: int):
         """Attack an enemy piece"""
+
         attacking_piece = self.board.get_piece_at(attacker_row, attacker_col)
         target_piece = self.board.get_piece_at(target_row, target_col)
         
@@ -686,6 +699,13 @@ class TFTGame:
             "attacker_pos": (attacker_row, attacker_col),
             "defender_pos": (target_row, target_col)
         }
+        self.actions_taken[self.current_player] = True
+        if all(self.actions_taken.values()):
+            self.end_battle_phase()
+
+        self.actions_taken[self.current_player] = True
+        if all(self.actions_taken.values()):
+            self.end_battle_phase()
 
         # Handle combat after animation (delayed)
         # The actual damage and removal will be handled after animation in draw()
@@ -872,7 +892,10 @@ class TFTGame:
                 title = item.name
                 cost = f"Cost: {item.cost}"
                 card_type = "Immediate" if item.immediate else "Stored"
-                effect = "Arrow Volley: -1 HP all units" if item.card_type == CardType.ARROW_VOLLEY else "Disarm: Set attack=0"
+                effectDict = {CardType.ARROW_VOLLEY: "Arrow Volley: -1 HP all units", 
+                              CardType.DISARM: "Disarm: Set attack=0", 
+                              CardType.REDEMPTION: "Redemption: black tiles take 1 dmg; white tiles gain 1 health"}
+                effect = effectDict[item.card_type]
                 lines = [title, cost, f"Type: {card_type}", effect, "Shop Card"]
             else:
                 title = f"{item.piece_type.value.title()[:12]}"
