@@ -313,7 +313,8 @@ class TFTGame:
         self.black_coins += 1
         
         self.add_to_log(f"Round {self.round_number} ended! +1 coin to both players")
-
+        if not self.end:
+            self.start_next_round()
 
     def end_game(self):
         """End the game"""
@@ -619,6 +620,8 @@ class TFTGame:
         
     def make_move(self, from_row: int, from_col: int, to_row: int, to_col: int):
         """Move a piece"""
+        
+
         moving_piece = self.board.get_piece_at(from_row, from_col)
         
         if not moving_piece or not moving_piece.is_alive():
@@ -629,12 +632,16 @@ class TFTGame:
         if target_piece is None:  # Only move to empty squares
             self.board.move_piece(from_row, from_col, to_row, to_col)
             
+        self.actions_taken[self.current_player] = True
+        if all(self.actions_taken.values()):
+            self.end_battle_phase()
         self.deselect_piece()
         self.switch_player()
         self.check_battle_end()
     
     def make_attack(self, attacker_row: int, attacker_col: int, target_row: int, target_col: int):
         """Attack an enemy piece"""
+
         attacking_piece = self.board.get_piece_at(attacker_row, attacker_col)
         target_piece = self.board.get_piece_at(target_row, target_col)
         
@@ -656,6 +663,10 @@ class TFTGame:
             "attacker_pos": (attacker_row, attacker_col),
             "defender_pos": (target_row, target_col)
         }
+
+        self.actions_taken[self.current_player] = True
+        if all(self.actions_taken.values()):
+            self.end_battle_phase()
 
         # Handle combat after animation (delayed)
         # The actual damage and removal will be handled after animation in draw()
