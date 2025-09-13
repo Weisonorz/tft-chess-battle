@@ -242,7 +242,22 @@ class Rook(Piece):
                     break  # Stop at any piece for movement
                     
         return moves
+    
+class Tower(Piece):
+    def __init__(self, color: Color, row: int, col: int):
+        super().__init__(PieceType.ROOK, color, row, col)
+        self.max_hp = 8
+        self.hp = self.max_hp
+        self.attack = 4
+        self.cost = 0
+        self.sprite = None
 
+    def get_cost(self) -> int:
+        return self.cost
+
+    def get_valid_moves(self, board) -> List[Tuple[int, int]]:
+        return []
+    
     def get_attack_targets(self, board) -> List[Tuple[int, int]]:
         """Rook attack: Attack first enemy found along vertical/horizontal paths"""
         targets = []
