@@ -5,18 +5,7 @@ from piece import Piece, Color, PieceType
 from game import GameState
 import random
 from enum import Enum
-
-class CardType(Enum):
-    ARROW_VOLLEY = "arrow_volley"
-    DISARM = "disarm"
-
-class Card:
-    def __init__(self, card_type: CardType, immediate: bool, icon_path: str, name: str, cost: int = 3):
-        self.card_type = card_type
-        self.immediate = immediate
-        self.icon_path = icon_path
-        self.name = name
-        self.cost = cost
+from card import Card, CardType
 
 class GamePhase(Enum):
     SETUP = "setup"
@@ -91,6 +80,7 @@ class TFTGame:
         self.black_reserve_area = pygame.Rect(screen_width - reserve_width - 20, board_offset_y, reserve_width, reserve_height // 2)
         self.shop_area = pygame.Rect(screen_width - shop_width - 20, board_offset_y + reserve_height // 2 + 20, shop_width, shop_height)
         self.economy_panel_rect = pygame.Rect(screen_width - panel_width - 40, 40, panel_width, panel_height)
+        
         
     def load_assets(self):
         pygame.font.init()
@@ -241,13 +231,8 @@ class TFTGame:
                 self.black_coins -= cost
             # Immediate effect
             if item.immediate and item.card_type == CardType.ARROW_VOLLEY:
-                # Arrow Volley: deal 1 damage to all units
-                for row in range(8):
-                    for col in range(8):
-                        piece = self.board.grid[row][col]
-                        if piece and piece.is_alive():
-                            piece.hp = max(0, piece.hp - 1)
-                self.add_to_log(f"{player.value.title()} used Arrow Volley! All units take 1 damage.")
+                # Arrow Volley: use card's effect logic
+                item.apply_effect(self, player)
             elif not item.immediate and item.card_type == CardType.DISARM:
                 # Disarm: add to inventory
                 if player == Color.WHITE:
@@ -315,6 +300,8 @@ class TFTGame:
         self.battle_ended = False
         self.current_player = Color.WHITE
         self.add_to_log(f"Round {self.round_number} Battle begins!")
+        self.actions_taken = {Color.WHITE: False, Color.BLACK: False}
+
         
     def end_battle_phase(self):
         """End battle and distribute rewards"""
