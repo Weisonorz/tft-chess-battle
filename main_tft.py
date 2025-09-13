@@ -12,15 +12,16 @@ def main():
     parser.add_argument("--width", type=int, default=1600, help="Screen width")
     parser.add_argument("--height", type=int, default=1000, help="Screen height")
     args, _ = parser.parse_known_args()
-    SCREEN_WIDTH = args.width
-    SCREEN_HEIGHT = args.height
-    screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.RESIZABLE)
+    # Default to fullscreen
+    screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
     pygame.display.set_caption("🏰 TFT Chess Battle ⚔️")
-    
+    SCREEN_WIDTH = pygame.display.Info().current_w
+    SCREEN_HEIGHT = pygame.display.Info().current_h
+
     # Set up the clock for frame rate
     clock = pygame.time.Clock()
     FPS = 60
-    
+
     # Create TFT game instance
     game = TFTGame(screen_width=SCREEN_WIDTH, screen_height=SCREEN_HEIGHT)
     
@@ -89,6 +90,7 @@ def main():
         # Overlay CRT scanline effect
         try:
             crt_overlay = pygame.image.load("Hackathon_image/crt_scanlines.png").convert_alpha()
+            crt_overlay = pygame.transform.scale(crt_overlay, (SCREEN_WIDTH, SCREEN_HEIGHT))
             screen.blit(crt_overlay, (0, 0))
         except Exception:
             pass

@@ -39,7 +39,8 @@ class TFTGame:
         self.black_coins = 3
         self.white_reserve = []  # Reserve pieces
         self.black_reserve = []
-        self.shop_items = []  # Available pieces in shop
+        self.white_shop_items = []  # White's shop
+        self.black_shop_items = []  # Black's shop
         self.shop_open = True  # Shop starts open
         self.battle_ended = False
         
@@ -67,7 +68,8 @@ class TFTGame:
         shop_height = int(screen_height * 0.4)
         panel_width = int(screen_width * 0.25)
         panel_height = int(screen_height * 0.18)
-        self.white_reserve_area = pygame.Rect(20, board_offset_y, reserve_width, reserve_height)
+        self.white_shop_area = pygame.Rect(20, board_offset_y, shop_width, shop_height)
+        self.white_reserve_area = pygame.Rect(20, board_offset_y + shop_height + 20, reserve_width, reserve_height - shop_height)
         self.black_reserve_area = pygame.Rect(screen_width - reserve_width - 20, board_offset_y, reserve_width, reserve_height // 2)
         self.shop_area = pygame.Rect(screen_width - shop_width - 20, board_offset_y + reserve_height // 2 + 20, shop_width, shop_height)
         self.economy_panel_rect = pygame.Rect(screen_width - panel_width - 40, 40, panel_width, panel_height)
@@ -135,17 +137,18 @@ class TFTGame:
         self.board.grid[1][7] = Piece(PieceType.PAWN, Color.BLACK, 1, 7)
         
     def generate_shop(self):
-        """Generate 5 random pieces for the shop"""
+        """Generate 5 random pieces for each shop"""
         piece_types = [PieceType.PAWN, PieceType.KNIGHT, PieceType.BISHOP, 
                       PieceType.ROOK, PieceType.QUEEN]
         weights = [40, 25, 20, 10, 5]  # Pawn most common, Queen rarest
         
-        self.shop_items = []
+        self.white_shop_items = []
+        self.black_shop_items = []
         for _ in range(5):
-            piece_type = random.choices(piece_types, weights=weights)[0]
-            # Create a neutral piece for display
-            piece = Piece(piece_type, Color.WHITE, 0, 0)  # Will be recolored when bought
-            self.shop_items.append(piece)
+            wt = random.choices(piece_types, weights=weights)[0]
+            bt = random.choices(piece_types, weights=weights)[0]
+            self.white_shop_items.append(Piece(wt, Color.WHITE, 0, 0))
+            self.black_shop_items.append(Piece(bt, Color.BLACK, 0, 0))
             
     def get_piece_cost(self, piece_type: PieceType) -> int:
         """Get the cost of a piece type"""
@@ -166,31 +169,30 @@ class TFTGame:
         return coins >= cost
         
     def buy_piece(self, player: Color, shop_index: int) -> bool:
-        """Buy a piece from shop and add to reserve"""
-        if not (0 <= shop_index < len(self.shop_items)):
+        """Buy a piece from the correct shop and add to reserve"""
+        shop_list = self.white_shop_items if player == Color.WHITE else self.black_shop_items
+        if not (0 <= shop_index < len(shop_list)):
             return False
-            
-        piece_template = self.shop_items[shop_index]
+
+        piece_template = shop_list[shop_index]
         cost = self.get_piece_cost(piece_template.piece_type)
-        
+
         if not self.can_afford(player, piece_template.piece_type):
             return False
-            
-        # Deduct coins
+
+        # Deduct coins and add to reserve
         if player == Color.WHITE:
             self.white_coins -= cost
-            # Create piece for white player
             new_piece = Piece(piece_template.piece_type, Color.WHITE, 0, 0)
             self.white_reserve.append(new_piece)
         else:
             self.black_coins -= cost
-            # Create piece for black player  
             new_piece = Piece(piece_template.piece_type, Color.BLACK, 0, 0)
             self.black_reserve.append(new_piece)
-            
-        # Remove from shop (do not replace, shop updates every three rounds)
-        self.shop_items.pop(shop_index)
-        
+
+        # Remove from shop
+        shop_list.pop(shop_index)
+
         self.add_to_log(f"{player.value.title()} bought {piece_template.piece_type.value.title()} for {cost} coins")
         return True
         
@@ -336,7 +338,7 @@ class TFTGame:
     def handle_click(self, mouse_x: int, mouse_y: int):
         """Handle mouse clicks - extended for TFT features"""
         # Handle shop clicks
-        if self.shop_open and self.shop_area.collidepoint(mouse_x, mouse_y):
+        if self.shop_open and (self.shop_area.collidepoint(mouse_x, mouse_y) or self.white_shop_area.collidepoint(mouse_x, mouse_y)):
             self.handle_shop_click(mouse_x, mouse_y)
             return
             
@@ -362,23 +364,38 @@ class TFTGame:
             return
             
     def handle_shop_click(self, mouse_x: int, mouse_y: int):
-        """Handle clicks on shop items"""
+        """Handle clicks on shop items for both white and black shops"""
         if not self.shop_open:
             return
-            
-        # Calculate which shop item was clicked
-        relative_x = mouse_x - self.shop_area.x
-        relative_y = mouse_y - self.shop_area.y
-        
-        # Vertical layout with larger items
-        if relative_y >= 40:  # Below title
-            shop_index = (relative_y - 40) // 65  # Match new item height spacing
-        else:
-            shop_index = -1
-                
-        if 0 <= shop_index < len(self.shop_items):
-            # Try to buy for current player
-            self.buy_piece(self.current_player, shop_index)
+
+        shop_width = self.shop_area.width
+        shop_height = self.shop_area.height
+        white_shop_rect = self.white_shop_area
+        black_shop_rect = self.shop_area
+
+        # Check white shop
+        if white_shop_rect.collidepoint(mouse_x, mouse_y):
+            relative_x = mouse_x - white_shop_rect.x
+            relative_y = mouse_y - white_shop_rect.y
+            if relative_y >= 40:
+                shop_index = (relative_y - 40) // 65
+            else:
+                shop_index = -1
+            if 0 <= shop_index < len(self.white_shop_items):
+                self.buy_piece(Color.WHITE, shop_index)
+                return
+
+        # Check black shop
+        if black_shop_rect.collidepoint(mouse_x, mouse_y):
+            relative_x = mouse_x - black_shop_rect.x
+            relative_y = mouse_y - black_shop_rect.y
+            if relative_y >= 40:
+                shop_index = (relative_y - 40) // 65
+            else:
+                shop_index = -1
+            if 0 <= shop_index < len(self.black_shop_items):
+                self.buy_piece(Color.BLACK, shop_index)
+                return
                 
     def handle_reserve_click(self, mouse_x: int, mouse_y: int, player: Color):
         """Handle clicks on reserve area for deployment"""
@@ -715,13 +732,27 @@ class TFTGame:
         # Shop hover
         hovered_shop_piece = None
         if self.shop_open:
-            for i in range(len(self.shop_items)):
-                x = self.shop_area.x + 12
-                y = self.shop_area.y + 48 + i * 65
-                item_width, item_height = self.shop_area.width - 24, 56
+            shop_width = self.shop_area.width
+            shop_height = self.shop_area.height
+            white_shop_rect = pygame.Rect(self.shop_area.x - shop_width - 30, self.shop_area.y, shop_width, shop_height)
+            black_shop_rect = pygame.Rect(self.shop_area.x, self.shop_area.y, shop_width, shop_height)
+            # White shop hover
+            for i in range(len(self.white_shop_items)):
+                x = white_shop_rect.x + 12
+                y = white_shop_rect.y + 48 + i * 65
+                item_width, item_height = shop_width - 24, 56
                 rect = pygame.Rect(x, y, item_width, item_height)
                 if rect.collidepoint(mouse_x, mouse_y):
-                    hovered_shop_piece = self.shop_items[i]
+                    hovered_shop_piece = self.white_shop_items[i]
+                    break
+            # Black shop hover (takes priority if both overlap)
+            for i in range(len(self.black_shop_items)):
+                x = black_shop_rect.x + 12
+                y = black_shop_rect.y + 48 + i * 65
+                item_width, item_height = shop_width - 24, 56
+                rect = pygame.Rect(x, y, item_width, item_height)
+                if rect.collidepoint(mouse_x, mouse_y):
+                    hovered_shop_piece = self.black_shop_items[i]
                     break
         # Draw hover window (shop takes priority)
         info_width, info_height = 180, 110
@@ -934,38 +965,24 @@ class TFTGame:
                     py = y + slot_height // 2 - placeholder_surface.get_height() // 2
                     screen.blit(placeholder_surface, (px, py))
     def draw_shop(self, screen: pygame.Surface):
-        """Draw the shop interface in retro pixel-art style"""
-        # Draw shop background with pixel border
-        pygame.draw.rect(screen, self.palette["panel"], self.shop_area)
-        pygame.draw.rect(screen, self.palette["border"], self.shop_area, 4)
-        # Pixel corners
-        pixel_size = 10
-        pygame.draw.rect(screen, self.palette["border"], (self.shop_area.x, self.shop_area.y, pixel_size, pixel_size))
-        pygame.draw.rect(screen, self.palette["border"], (self.shop_area.x + self.shop_area.width - pixel_size, self.shop_area.y, pixel_size, pixel_size))
-        pygame.draw.rect(screen, self.palette["border"], (self.shop_area.x, self.shop_area.y + self.shop_area.height - pixel_size, pixel_size, pixel_size))
-        pygame.draw.rect(screen, self.palette["border"], (self.shop_area.x + self.shop_area.width - pixel_size, self.shop_area.y + self.shop_area.height - pixel_size, pixel_size, pixel_size))
+        """Draw white shop at far left and black shop at right"""
+        shop_width = self.shop_area.width
+        shop_height = self.shop_area.height
+        white_shop_rect = self.white_shop_area
+        black_shop_rect = self.shop_area
 
-        # Draw shop title in pixel font
-        shop_title = "SHOP"
+        # Draw white shop
+        pygame.draw.rect(screen, self.palette["panel"], white_shop_rect)
+        pygame.draw.rect(screen, self.palette["border"], white_shop_rect, 4)
+        shop_title = "WHITE SHOP"
         title_surface = self.title_font.render(shop_title, True, self.palette["neon_yellow"])
-        screen.blit(title_surface, (self.shop_area.x + 18, self.shop_area.y + 8))
-
-        # Draw shop items as pixel cards
-        for i, piece in enumerate(self.shop_items):
-            x = self.shop_area.x + 12
-            y = self.shop_area.y + 48 + i * 65
-            item_width, item_height = self.shop_area.width - 24, 56
-
-            # Card background and border
+        screen.blit(title_surface, (white_shop_rect.x + 18, white_shop_rect.y + 8))
+        for i, piece in enumerate(self.white_shop_items):
+            x = white_shop_rect.x + 12
+            y = white_shop_rect.y + 48 + i * 65
+            item_width, item_height = shop_width - 24, 56
             pygame.draw.rect(screen, self.palette["bg"], (x, y, item_width, item_height))
             pygame.draw.rect(screen, self.palette["border"], (x, y, item_width, item_height), 3)
-            # Pixel corners
-            pygame.draw.rect(screen, self.palette["border"], (x, y, 8, 8))
-            pygame.draw.rect(screen, self.palette["border"], (x + item_width - 8, y, 8, 8))
-            pygame.draw.rect(screen, self.palette["border"], (x, y + item_height - 8, 8, 8))
-            pygame.draw.rect(screen, self.palette["border"], (x + item_width - 8, y + item_height - 8, 8, 8))
-
-            # Piece sprite icon
             sprite = self.piece_sprites.get(piece.piece_type)
             if sprite:
                 sprite_size = min(item_height - 12, 32)
@@ -979,90 +996,107 @@ class TFTGame:
                 sprite_x = x + 12
                 sprite_y = y + (item_height - 32) // 2
                 screen.blit(symbol_surface, (sprite_x, sprite_y))
-
-            # Piece name in blocky pixel font
             name_text = piece.piece_type.value.upper()
             name_surface = self.font.render(name_text, True, self.palette["neon_cyan"])
             screen.blit(name_surface, (x + 60, y + 8))
-
-            # Cost in pixel font, neon yellow
             cost = self.get_piece_cost(piece.piece_type)
             cost_text = f"{cost}"
             cost_surface = self.font.render(cost_text, True, self.palette["neon_yellow"])
             screen.blit(cost_surface, (x + 60, y + 28))
-
-            # Coin sprite (user-provided)
             try:
                 coin_img = pygame.image.load("Hackathon_image/coin.png")
                 coin_img = pygame.transform.scale(coin_img, (18, 18))
                 screen.blit(coin_img, (x + 90, y + 28))
             except Exception:
                 pass
-
-            # Affordability: overlay red pixel PNG if not enough gold
-            can_afford_white = self.white_coins >= cost
-            can_afford_black = self.black_coins >= cost
-            if not (can_afford_white or can_afford_black):
+            can_afford = self.white_coins >= cost
+            if not can_afford:
                 try:
                     red_overlay = pygame.image.load("Hackathon_image/red_overlay.png")
                     red_overlay = pygame.transform.scale(red_overlay, (item_width, item_height))
                     screen.blit(red_overlay, (x, y))
                 except Exception:
-                    # Fallback: draw solid red rectangle with alpha
                     overlay = pygame.Surface((item_width, item_height), pygame.SRCALPHA)
                     overlay.fill((255, 0, 0, 120))
                     screen.blit(overlay, (x, y))
 
-        # Hover window for shop piece info
-        mouse_x, mouse_y = pygame.mouse.get_pos()
-        hovered_index = None
-        for i in range(len(self.shop_items)):
-            x = self.shop_area.x + 12
-            y = self.shop_area.y + 48 + i * 65
-            item_width, item_height = self.shop_area.width - 24, 56
-            rect = pygame.Rect(x, y, item_width, item_height)
-            if rect.collidepoint(mouse_x, mouse_y):
-                hovered_index = i
-                break
-        if hovered_index is not None:
-            piece = self.shop_items[hovered_index]
-            info_width, info_height = 180, 110
-            info_x = min(max(mouse_x + 20, 10), self.screen_width - info_width - 10)
-            info_y = min(max(mouse_y + 20, 10), self.screen_height - info_height - 10)
-            info_rect = pygame.Rect(info_x, info_y, info_width, info_height)
-            pygame.draw.rect(screen, (30, 30, 50), info_rect)
-            pygame.draw.rect(screen, (100, 255, 180), info_rect, 2)
-            font = pygame.font.Font("Hackathon_image/pixel_font.ttf", 22)
-            title = f"{piece.piece_type.value.title()[:12]}"
-            hp = f"HP: {piece.hp}/{piece.max_hp}"
-            atk = f"ATK: {piece.attack}"
-            cost = f"Cost: {piece.cost}"
-            pos = "Shop Item"
-            lines = [title, hp, atk, cost, pos]
-            for i, line in enumerate(lines):
-                text = font.render(line[:22], True, (255, 255, 255))
-                screen.blit(text, (info_x + 12, info_y + 12 + i * 20))
+        # Draw black shop
+        pygame.draw.rect(screen, self.palette["panel"], black_shop_rect)
+        pygame.draw.rect(screen, self.palette["border"], black_shop_rect, 4)
+        shop_title = "BLACK SHOP"
+        title_surface = self.title_font.render(shop_title, True, self.palette["neon_yellow"])
+        screen.blit(title_surface, (black_shop_rect.x + 18, black_shop_rect.y + 8))
+        for i, piece in enumerate(self.black_shop_items):
+            x = black_shop_rect.x + 12
+            y = black_shop_rect.y + 48 + i * 65
+            item_width, item_height = shop_width - 24, 56
+            pygame.draw.rect(screen, self.palette["bg"], (x, y, item_width, item_height))
+            pygame.draw.rect(screen, self.palette["border"], (x, y, item_width, item_height), 3)
+            sprite = self.piece_sprites.get(piece.piece_type)
+            if sprite:
+                sprite_size = min(item_height - 12, 32)
+                shop_sprite = pygame.transform.scale(sprite, (sprite_size, sprite_size))
+                sprite_x = x + 12
+                sprite_y = y + (item_height - sprite_size) // 2
+                screen.blit(shop_sprite, (sprite_x, sprite_y))
+            else:
+                symbol = self.get_piece_symbol(piece.piece_type)
+                symbol_surface = self.font.render(symbol, True, self.palette["white"])
+                sprite_x = x + 12
+                sprite_y = y + (item_height - 32) // 2
+                screen.blit(symbol_surface, (sprite_x, sprite_y))
+            name_text = piece.piece_type.value.upper()
+            name_surface = self.font.render(name_text, True, self.palette["neon_cyan"])
+            screen.blit(name_surface, (x + 60, y + 8))
+            cost = self.get_piece_cost(piece.piece_type)
+            cost_text = f"{cost}"
+            cost_surface = self.font.render(cost_text, True, self.palette["neon_yellow"])
+            screen.blit(cost_surface, (x + 60, y + 28))
+            try:
+                coin_img = pygame.image.load("Hackathon_image/coin.png")
+                coin_img = pygame.transform.scale(coin_img, (18, 18))
+                screen.blit(coin_img, (x + 90, y + 28))
+            except Exception:
+                pass
+            can_afford = self.black_coins >= cost
+            if not can_afford:
+                try:
+                    red_overlay = pygame.image.load("Hackathon_image/red_overlay.png")
+                    red_overlay = pygame.transform.scale(red_overlay, (item_width, item_height))
+                    screen.blit(red_overlay, (x, y))
+                except Exception:
+                    overlay = pygame.Surface((item_width, item_height), pygame.SRCALPHA)
+                    overlay.fill((255, 0, 0, 120))
+                    screen.blit(overlay, (x, y))
             
     def draw_shop_closed(self, screen: pygame.Surface):
-        """Draw shop closed message"""
+        """Draw shop closed message for both shops"""
+        # Black shop
         pygame.draw.rect(screen, (40, 40, 50), self.shop_area)
         pygame.draw.rect(screen, (100, 100, 120), self.shop_area, 2)
-        
         closed_text = "🔒 Shop Closed"
         next_open = 3 - (self.round_number % 3)
         if next_open == 3:
             next_open = 0
-        
         info_text = f"Opens in {next_open} rounds"
-        
         closed_surface = self.font.render(closed_text, True, (150, 150, 150))
         info_surface = self.small_font.render(info_text, True, (120, 120, 120))
-        
+        # Black shop
         closed_x = self.shop_area.x + self.shop_area.width // 2 - closed_surface.get_width() // 2
         info_x = self.shop_area.x + self.shop_area.width // 2 - info_surface.get_width() // 2
-        
-        screen.blit(closed_surface, (closed_x, self.shop_area.y + 60))
-        screen.blit(info_surface, (info_x, self.shop_area.y + 90))
+        closed_y = self.shop_area.y + int(self.shop_area.height * 0.35)
+        info_y = self.shop_area.y + int(self.shop_area.height * 0.55)
+        screen.blit(closed_surface, (closed_x, closed_y))
+        screen.blit(info_surface, (info_x, info_y))
+        # White shop
+        pygame.draw.rect(screen, (40, 40, 50), self.white_shop_area)
+        pygame.draw.rect(screen, (100, 100, 120), self.white_shop_area, 2)
+        closed_x_w = self.white_shop_area.x + self.white_shop_area.width // 2 - closed_surface.get_width() // 2
+        info_x_w = self.white_shop_area.x + self.white_shop_area.width // 2 - info_surface.get_width() // 2
+        closed_y_w = self.white_shop_area.y + int(self.white_shop_area.height * 0.35)
+        info_y_w = self.white_shop_area.y + int(self.white_shop_area.height * 0.55)
+        screen.blit(closed_surface, (closed_x_w, closed_y_w))
+        screen.blit(info_surface, (info_x_w, info_y_w))
         
     def draw_battle_log(self, screen: pygame.Surface):
         """Draw battle log in retro terminal style with typewriter effect and color coding"""
