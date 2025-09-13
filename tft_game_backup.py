@@ -615,6 +615,28 @@ class TFTGame:
         
         # Draw pieces with custom rendering using loaded images
         self.draw_pieces_with_images(screen)
+
+        # Draw dragging piece at mouse position if dragging from reserve
+        if self.dragging_piece and self.dragging_from_reserve:
+            sprite = self.piece_sprites.get(self.dragging_piece.piece_type)
+            if sprite:
+                piece_size = self.board.cell_size - 10
+                scaled_sprite = pygame.transform.scale(sprite, (piece_size, piece_size))
+                if self.dragging_piece.color == Color.BLACK:
+                    tinted_sprite = scaled_sprite.copy()
+                    dark_overlay = pygame.Surface((piece_size, piece_size))
+                    dark_overlay.set_alpha(100)
+                    dark_overlay.fill((100, 50, 50))
+                    tinted_sprite.blit(dark_overlay, (0, 0))
+                    scaled_sprite = tinted_sprite
+                screen.blit(scaled_sprite, (self.drag_offset_x - piece_size // 2, self.drag_offset_y - piece_size // 2))
+            else:
+                symbol = self.get_piece_symbol(self.dragging_piece.piece_type)
+                font = pygame.font.Font(None, 36)
+                text_color = (255, 255, 255) if self.dragging_piece.color == Color.WHITE else (150, 50, 50)
+                text = font.render(symbol, True, text_color)
+                text_rect = text.get_rect(center=(self.drag_offset_x, self.drag_offset_y))
+                screen.blit(text, text_rect)
         
         # Draw UI elements
         self.draw_tft_ui(screen)

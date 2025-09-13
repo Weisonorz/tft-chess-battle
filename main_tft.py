@@ -26,32 +26,50 @@ def main():
     # Main game loop
     running = True
     while running:
-        # Handle events
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
+
+            # --- Mouse handling ---
             elif event.type == pygame.MOUSEBUTTONDOWN:
-                if event.button == 1:  # Left mouse button
-                    mouse_x, mouse_y = pygame.mouse.get_pos()
-                    game.handle_click(mouse_x, mouse_y)
+                if event.button == 1:  # Left click
+                    mouse_x, mouse_y = event.pos
+                    # First try drag from reserve
+                    game.handle_mouse_down(mouse_x, mouse_y)
+
+                    # If not dragging, treat it as a normal click (shop/board/etc.)
+                    if not game.dragging_piece:
+                        game.handle_click(mouse_x, mouse_y)
+
+            elif event.type == pygame.MOUSEMOTION:
+                mouse_x, mouse_y = event.pos
+                game.handle_mouse_motion(mouse_x, mouse_y)
+
+            elif event.type == pygame.MOUSEBUTTONUP:
+                if event.button == 1:  # Left click released
+                    mouse_x, mouse_y = event.pos
+                    if game.dragging_piece:
+                        game.handle_mouse_up(mouse_x, mouse_y)
+                    else:
+                        # This ensures clicks still register properly
+                        game.handle_click(mouse_x, mouse_y)
+
+            # --- Keyboard handling ---
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_SPACE and game.selected_piece and game.phase == GamePhase.BATTLE:
-                    # Toggle action mode during battle
                     game.toggle_action_mode()
                 elif event.key == pygame.K_b and game.phase in [GamePhase.SETUP, GamePhase.SHOP]:
-                    # Start battle phase
                     game.start_battle_phase()
                 elif event.key == pygame.K_n and game.phase == GamePhase.END_ROUND:
-                    # Start next round
                     game.start_next_round()
-                elif event.key == pygame.K_e and game.battle_ended and game.phase == GamePhase.BATTLE:
-                    # End battle manually
+                elif event.key == pygame.K_e and not game.battle_ended and game.phase == GamePhase.BATTLE:
                     game.end_battle_phase()
                 elif event.key == pygame.K_r:  # Reset game
                     game = TFTGame()
                     game.add_to_log("Game reset! TFT Chess Battle restarted!")
-                elif event.key == pygame.K_ESCAPE:  # Exit with ESC
+                elif event.key == pygame.K_ESCAPE:
                     running = False
+
         
         # Draw everything
         game.draw(screen)
