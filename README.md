@@ -88,6 +88,43 @@ Transform traditional chess into an exciting strategy game where pieces have **H
 | **Reset Game** | R | Start over |
 | **Quit** | ESC | Exit game |
 
+---
+
+## 🃏 Effect Cards & Shop System
+
+### Card System
+
+- **Effect cards** are now integrated into the shop and economy.
+- Shop appears every 3 rounds, with 5 slots per shop:
+  - **50%** chance for chess piece
+  - **30%** chance for effect card
+  - **20%** chance for consumable
+- Cards cost **3 coins**.
+
+#### Card Types
+
+- **Arrow Volley** (Immediate): Instantly deals 1 damage to all enemy units on the board. Dead units are removed and their spaces freed.
+- **Disarm** (Stored): Added to your Card Inventory. Click to select an enemy unit and set its attack to 0 permanently.
+
+#### UI Integration
+
+- Shop UI displays cards with icons, name, cost, and a ⚡ for immediate cards.
+- Stored cards appear in a Card Inventory panel and are clickable for targeted effects.
+
+#### Usage
+
+- Buying a card deducts coins.
+- Immediate cards resolve instantly.
+- Stored cards are added to inventory for later use.
+
+#### Restart Behavior
+
+- After game over, the UI does **not** restart automatically.
+- Manual restart is required via mouse click or key press.
+- Restarted game always launches in fullscreen mode.
+
+---
+
 ## 🏗️ Technical Architecture
 
 ### Project Structure
@@ -95,6 +132,7 @@ Transform traditional chess into an exciting strategy game where pieces have **H
 tft-chess-battle/
 ├── main_tft.py          # Main game launcher
 ├── tft_game.py          # Core TFT game logic
+├── card.py              # Card system and effects
 ├── game.py              # Original chess game
 ├── piece.py             # Chess piece classes
 ├── board.py             # Game board management
@@ -113,6 +151,7 @@ tft-chess-battle/
 - **`TFTGame`**: Main game controller with shop/economy systems
 - **`Piece`**: Individual chess pieces with RPG stats
 - **`Board`**: 8x8 game board with rendering
+- **`Card`**: Effect card system and logic
 - **UI System**: Vertical layout preventing component blocking
 
 ## 🎨 Game Phases
@@ -123,9 +162,9 @@ tft-chess-battle/
 - Prepare for battle
 
 ### 2. **Shop Phase** (Every 3 rounds)
-- 5 random pieces available for purchase
-- Weighted selection (Pawns common, Queens rare)
-- Build your reserve army
+- 5 random items available for purchase (pieces, cards, consumables)
+- Weighted selection (Pawns common, Queens rare, cards and consumables mixed)
+- Build your reserve army and card inventory
 
 ### 3. **Battle Phase**
 - Turn-based combat
