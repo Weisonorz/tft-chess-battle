@@ -43,7 +43,10 @@ def main():
             # --- Mouse handling ---
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 if game.end:
-                    game = TFTGame()
+                    screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
+                    SCREEN_WIDTH = pygame.display.Info().current_w
+                    SCREEN_HEIGHT = pygame.display.Info().current_h
+                    game = TFTGame(screen_width=SCREEN_WIDTH, screen_height=SCREEN_HEIGHT)
                     game.add_to_log("Game reset! TFT Chess Battle restarted!")
                 if event.button == 1:  # Left click
                     mouse_x, mouse_y = event.pos
@@ -79,8 +82,9 @@ def main():
                 elif event.key == pygame.K_n and game.phase == GamePhase.END_ROUND:
                     game.start_next_round()
                 elif event.key == pygame.K_r:  # Reset game
-                    game = TFTGame()
-                    game.add_to_log("Game reset! TFT Chess Battle restarted!")
+                    if not game.end:
+                        game = TFTGame()
+                        game.add_to_log("Game reset! TFT Chess Battle restarted!")
                 elif event.key == pygame.K_ESCAPE:
                     running = False
 
