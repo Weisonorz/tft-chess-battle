@@ -1,6 +1,6 @@
-# 🏰 TFT Chess Battle ⚔️
+# 🏰 Build-Up Chess Battle ⚔️
 
-A revolutionary chess game that combines traditional chess mechanics with **Teamfight Tactics (TFT)** gameplay elements. Built for HackCMU's "Retro - Turn Something New into Something Old" track.
+A revolutionary chess game that combines traditional chess mechanics and gameplay elements. Built for HackCMU's "Retro - Turn Something New into Something Old" track.
 
 ![Python](https://img.shields.io/badge/python-v3.8+-blue.svg)
 ![Pygame](https://img.shields.io/badge/pygame-v2.0+-green.svg)
@@ -8,7 +8,7 @@ A revolutionary chess game that combines traditional chess mechanics with **Team
 
 ## 🎮 Game Overview
 
-Transform traditional chess into an exciting strategy game where pieces have **HP**, **Attack values**, and **unique abilities**. Combine this with TFT's economic system, shop mechanics, and strategic army building for an entirely new gaming experience!
+Transform traditional chess into an exciting strategy game where pieces have **HP**, **Attack values**, and **unique abilities**. Combine this economic system, shop mechanics, and strategic army building for an entirely new gaming experience!
 
 ### 🌟 Key Features
 
