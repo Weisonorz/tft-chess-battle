@@ -242,6 +242,28 @@ class Rook(Piece):
                     break  # Stop at any piece for movement
                     
         return moves
+
+    def get_attack_targets(self, board) -> List[Tuple[int, int]]:
+        """Rook attack: Attack first enemy found along vertical/horizontal paths"""
+        targets = []
+        directions = [(-1, 0), (1, 0), (0, -1), (0, 1)]
+        
+        for dr, dc in directions:
+            for i in range(1, 8):
+                new_row = self.row + i * dr
+                new_col = self.col + i * dc
+                
+                if not (0 <= new_row < 8 and 0 <= new_col < 8):
+                    break
+                    
+                target_piece = board[new_row][new_col]
+                if target_piece:
+                    if target_piece.color != self.color and target_piece.is_alive():
+                        targets.append((new_row, new_col))
+                    break  # Stop at first piece found
+                    
+        return targets
+
     
 class Tower(Piece):
     def __init__(self, color: Color, row: int, col: int):
