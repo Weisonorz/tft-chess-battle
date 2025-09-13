@@ -99,52 +99,56 @@ class Board:
         y = self.board_offset_y + row * self.cell_size + self.cell_size // 2
         return x, y
     
-    def draw(self, screen: pygame.Surface):
-        # Draw wooden border
-        border_color = (101, 67, 33)  # Dark brown
+    def draw(self, screen: pygame.Surface, palette=None, pixel_font_path=None):
+        # Use retro palette if provided
+        if palette is None:
+            palette = {
+                "bg": (10, 10, 20),
+                "panel": (30, 30, 50),
+                "border": (80, 255, 180),
+                "neon_green": (80, 255, 80),
+                "neon_cyan": (80, 255, 255),
+                "neon_yellow": (255, 255, 80),
+                "neon_red": (255, 80, 80),
+                "white": (255, 255, 255),
+                "gray": (120, 120, 120),
+                "black": (0, 0, 0),
+            }
+        # Draw chunky pixel border
         border_rect = pygame.Rect(
             self.board_offset_x - self.border_width,
             self.board_offset_y - self.border_width,
             8 * self.cell_size + 2 * self.border_width,
             8 * self.cell_size + 2 * self.border_width
         )
-        pygame.draw.rect(screen, border_color, border_rect)
-        pygame.draw.rect(screen, (139, 90, 43), border_rect, 5)  # Lighter brown border
-        
-        # Draw chess squares with beautiful colors
-        light_color = (240, 217, 181)  # Cream
-        dark_color = (181, 136, 99)   # Brown
-        
+        pygame.draw.rect(screen, palette["border"], border_rect, 0)
+        pygame.draw.rect(screen, palette["neon_cyan"], border_rect, 4)
+
+        # Draw chess squares with solid retro colors
+        light_color = (40, 40, 60)
+        dark_color = (20, 20, 30)
         for row in range(8):
             for col in range(8):
                 color = light_color if (row + col) % 2 == 0 else dark_color
                 x = self.board_offset_x + col * self.cell_size
                 y = self.board_offset_y + row * self.cell_size
-                
-                # Draw main square
                 pygame.draw.rect(screen, color, (x, y, self.cell_size, self.cell_size))
-                
-                # Add subtle inner shadow for depth
-                shadow_color = tuple(max(0, c - 20) for c in color)
-                pygame.draw.rect(screen, shadow_color, (x, y, self.cell_size, 2))
-                pygame.draw.rect(screen, shadow_color, (x, y, 2, self.cell_size))
-                
-        # Draw coordinate labels
-        font = pygame.font.Font(None, 24)
-        # Column letters (a-h)
+                # Draw chunky pixel outline for each cell
+                pygame.draw.rect(screen, palette["border"], (x, y, self.cell_size, self.cell_size), 3)
+
+        # Draw coordinate labels in pixel font
+        font = pygame.font.Font(pixel_font_path or "Hackathon_image/pixel_font.ttf", 18)
         for col in range(8):
             letter = chr(ord('a') + col)
-            text = font.render(letter, True, (255, 255, 255))
-            x = self.board_offset_x + col * self.cell_size + self.cell_size // 2 - 5
+            text = font.render(letter, True, palette["neon_green"])
+            x = self.board_offset_x + col * self.cell_size + self.cell_size // 2 - 8
             y = self.board_offset_y + 8 * self.cell_size + 5
             screen.blit(text, (x, y))
-            
-        # Row numbers (1-8)
         for row in range(8):
             number = str(8 - row)
-            text = font.render(number, True, (255, 255, 255))
-            x = self.board_offset_x - 15
-            y = self.board_offset_y + row * self.cell_size + self.cell_size // 2 - 8
+            text = font.render(number, True, palette["neon_green"])
+            x = self.board_offset_x - 22
+            y = self.board_offset_y + row * self.cell_size + self.cell_size // 2 - 10
             screen.blit(text, (x, y))
     
     def draw_pieces(self, screen: pygame.Surface):
@@ -213,18 +217,19 @@ class Board:
                         pygame.draw.rect(screen, (255, 255, 255), (bar_x, bar_y, bar_width, bar_height), 1)
     
     def highlight_cell(self, screen: pygame.Surface, row: int, col: int, color: Tuple[int, int, int]):
+        # Draw chunky neon pixel outline for retro highlight
         if self.is_valid_position(row, col):
             x = self.board_offset_x + col * self.cell_size
             y = self.board_offset_y + row * self.cell_size
-            
-            # Draw glowing highlight effect
-            for thickness in range(5, 0, -1):
-                alpha = 50 - thickness * 8
-                highlight_color = (*color, alpha) if len(color) == 3 else color
-                pygame.draw.rect(screen, highlight_color[:3], 
-                               (x - thickness, y - thickness, 
-                                self.cell_size + 2 * thickness, 
-                                self.cell_size + 2 * thickness), thickness)
+            outline_color = color
+            # Draw 3-pixel thick neon border
+            pygame.draw.rect(screen, outline_color, (x, y, self.cell_size, self.cell_size), 3)
+            # Draw pixel corners for extra retro effect
+            pixel_size = 7
+            pygame.draw.rect(screen, outline_color, (x, y, pixel_size, pixel_size))
+            pygame.draw.rect(screen, outline_color, (x + self.cell_size - pixel_size, y, pixel_size, pixel_size))
+            pygame.draw.rect(screen, outline_color, (x, y + self.cell_size - pixel_size, pixel_size, pixel_size))
+            pygame.draw.rect(screen, outline_color, (x + self.cell_size - pixel_size, y + self.cell_size - pixel_size, pixel_size, pixel_size))
     
     def highlight_moves(self, screen: pygame.Surface, moves: List[Tuple[int, int]]):
         for row, col in moves:

@@ -53,18 +53,35 @@ class TFTGame:
         self.setup_initial_board()
         self.generate_shop()
         
-        # UI layout - redesigned with larger spacing and no board blocking
-        # Board is now at (250, 150) with size 720x720 (8*90)
-        self.white_reserve_area = pygame.Rect(50, 150, 180, 600)   # Left side - wider with more space
-        self.black_reserve_area = pygame.Rect(1000, 150, 180, 350)  # Right side top - wider  
-        self.shop_area = pygame.Rect(1200, 150, 180, 400)           # Far right - wider
+        # UI layout - adjusted to prevent overlap
+        # Board is at (250, 150) with size 720x720 (8*90)
+        self.white_reserve_area = pygame.Rect(30, 150, 180, 600)    # Left side
+        self.black_reserve_area = pygame.Rect(1300, 150, 180, 350)  # Far right, top
+        self.shop_area = pygame.Rect(1300, 520, 180, 400)           # Far right, below black reserve
+        self.economy_panel_rect = pygame.Rect(1050, 40, 400, 180)   # Top right, above shop and black reserve
         
     def load_assets(self):
         pygame.font.init()
-        self.font = pygame.font.Font(None, 28)        # Larger main font
-        self.title_font = pygame.font.Font(None, 40)  # Larger title font
-        self.small_font = pygame.font.Font(None, 22)  # Larger small font
-        
+        # Load pixel font provided by user
+        PIXEL_FONT_PATH = "Hackathon_image/pixel_font.ttf"  # Replace with actual filename
+        self.font = pygame.font.Font(PIXEL_FONT_PATH, 28)
+        self.title_font = pygame.font.Font(PIXEL_FONT_PATH, 40)
+        self.small_font = pygame.font.Font(PIXEL_FONT_PATH, 22)
+
+        # Retro color palette
+        self.palette = {
+            "bg": (10, 10, 20),
+            "panel": (30, 30, 50),
+            "border": (80, 255, 180),
+            "neon_green": (80, 255, 80),
+            "neon_cyan": (80, 255, 255),
+            "neon_yellow": (255, 255, 80),
+            "neon_red": (255, 80, 80),
+            "white": (255, 255, 255),
+            "gray": (120, 120, 120),
+            "black": (0, 0, 0),
+        }
+
         # Load piece sprites from Hackathon_image directory
         self.piece_sprites = {}
         piece_files = {
@@ -179,31 +196,30 @@ class TFTGame:
             if not (0 <= reserve_index < len(self.white_reserve)):
                 return False
             piece = self.white_reserve[reserve_index]
-            # Check if position is in white's deployment zone (rows 5-7)
             if not (5 <= board_row <= 7):
                 return False
         else:
             if not (0 <= reserve_index < len(self.black_reserve)):
                 return False
             piece = self.black_reserve[reserve_index]
-            # Check if position is in black's deployment zone (rows 0-2)
             if not (0 <= board_row <= 2):
                 return False
                 
-        # Check if target position is empty
         if self.board.grid[board_row][board_col] is not None:
             return False
             
-        # Deploy piece
         piece.row = board_row
         piece.col = board_col
         self.board.grid[board_row][board_col] = piece
         
-        # Remove from reserve
         if player == Color.WHITE:
             self.white_reserve.remove(piece)
         else:
             self.black_reserve.remove(piece)
+        
+        # Play placement/click sound
+        if self.snd_click:
+            self.snd_click.play()
             
         self.add_to_log(f"{player.value.title()} deployed {piece.piece_type.value.title()}")
         return True
@@ -671,7 +687,7 @@ class TFTGame:
         # Draw title
         title_text = f"🏰 TFT Chess Battle - Round {self.round_number} 🏰"
         title_surface = self.title_font.render(title_text, True, (255, 215, 100))
-        title_x = screen.get_width() // 2 - title_surface.get_width() // 2
+        title_x = screen.get_width() // 2 - title_surface.get_width() // 2 - 200
         screen.blit(title_surface, (title_x, 10))
         
         # Draw phase and turn indicator
@@ -683,14 +699,14 @@ class TFTGame:
         turn_color = (255, 255, 100) if self.current_player == Color.WHITE else (255, 150, 150)
         turn_text = f"Turn: {self.current_player.value.upper()}"
         turn_surface = self.font.render(turn_text, True, turn_color)
-        screen.blit(turn_surface, (200, 40))
+        screen.blit(turn_surface, (50, 80))
         
         # Draw action mode if piece is selected
         if self.selected_piece:
             mode_color = (100, 255, 100) if self.action_mode == "move" else (255, 100, 100)
             mode_text = f"Mode: {self.action_mode.upper()}"
             mode_surface = self.font.render(mode_text, True, mode_color)
-            screen.blit(mode_surface, (350, 40))
+            screen.blit(mode_surface, (350, 60))
         
         # Draw detailed economic system UI
         self.draw_economy_panel(screen)
@@ -711,9 +727,9 @@ class TFTGame:
     def draw_economy_panel(self, screen: pygame.Surface):
         """Draw detailed economic system information"""
         # Economy panel positioning - moved to fit new layout
-        panel_x = 700
-        panel_y = 50
-        panel_width = 400
+        panel_x = 1000
+        panel_y = 20
+        panel_width = 600
         panel_height = 120
         
         # Draw economy panel background
@@ -739,7 +755,7 @@ class TFTGame:
         
         screen.blit(white_coins_surface, (panel_x + 10, white_y))
         screen.blit(white_reserve_surface, (panel_x + 120, white_y))
-        screen.blit(white_value_surface, (panel_x + 220, white_y))
+        screen.blit(white_value_surface, (panel_x + 280, white_y))
         
         # Black player economics
         black_y = panel_y + 50
@@ -754,7 +770,7 @@ class TFTGame:
         
         screen.blit(black_coins_surface, (panel_x + 10, black_y))
         screen.blit(black_reserve_surface, (panel_x + 120, black_y))
-        screen.blit(black_value_surface, (panel_x + 220, black_y))
+        screen.blit(black_value_surface, (panel_x + 280, black_y))
         
         # Economic info
         eco_y = panel_y + 75
@@ -763,115 +779,163 @@ class TFTGame:
         screen.blit(income_surface, (panel_x + 10, eco_y))
         
     def draw_reserve_area(self, screen: pygame.Surface, area: pygame.Rect, reserve: List[Piece], player: Color):
-        """Draw reserve area for a player"""
-        # Draw background
-        color = (40, 60, 80) if player == Color.WHITE else (80, 40, 40)
-        pygame.draw.rect(screen, color, area)
-        pygame.draw.rect(screen, (150, 150, 150), area, 2)
-        
-        # Draw label
-        label = f"{player.value.title()} Reserve ({len(reserve)}/8)"
-        label_surface = self.small_font.render(label, True, (255, 255, 255))
-        screen.blit(label_surface, (area.x + 5, area.y + 5))
-        
-        # Draw reserve pieces in improved layout
-        pieces_per_row = 3  # 3 pieces per row for wider reserve areas
-        
-        for i, piece in enumerate(reserve[:8]):  # Max 8 in reserve
+        """Draw reserve area in retro pixel-art style"""
+        # Draw background panel with pixel border
+        pygame.draw.rect(screen, self.palette["panel"], area)
+        pygame.draw.rect(screen, self.palette["border"], area, 4)
+        pixel_size = 10
+        pygame.draw.rect(screen, self.palette["border"], (area.x, area.y, pixel_size, pixel_size))
+        pygame.draw.rect(screen, self.palette["border"], (area.x + area.width - pixel_size, area.y, pixel_size, pixel_size))
+        pygame.draw.rect(screen, self.palette["border"], (area.x, area.y + area.height - pixel_size, pixel_size, pixel_size))
+        pygame.draw.rect(screen, self.palette["border"], (area.x + area.width - pixel_size, area.y + area.height - pixel_size, pixel_size, pixel_size))
+
+        # Draw label in pixel font
+        label = f"{player.value.upper()} RESERVE"
+        label_surface = self.font.render(label, True, self.palette["neon_cyan"])
+        screen.blit(label_surface, (area.x + 8, area.y + 8))
+
+        # Draw reserve slots as pixel frames
+        pieces_per_row = 3
+        max_slots = 8
+        slot_width, slot_height = 50, 55
+        time_ms = pygame.time.get_ticks()
+        flicker = (time_ms // 200) % 2 == 0
+
+        for i in range(max_slots):
             col = i % pieces_per_row
             row = i // pieces_per_row
-            x = area.x + 10 + col * 55
-            y = area.y + 30 + row * 60
-            slot_width, slot_height = 50, 55
-            
-            # Draw piece background
-            piece_color = (200, 200, 220) if player == Color.WHITE else (220, 150, 150)
-            pygame.draw.rect(screen, piece_color, (x, y, slot_width, slot_height))
-            pygame.draw.rect(screen, (100, 100, 100), (x, y, slot_width, slot_height), 1)
-            
-            # Use actual piece image if available
-            sprite = self.piece_sprites.get(piece.piece_type)
-            if sprite:
-                # Scale to fit reserve slot
-                sprite_size = min(slot_width - 10, slot_height - 10)
-                small_sprite = pygame.transform.scale(sprite, (sprite_size, sprite_size))
-                if piece.color == Color.BLACK:
-                    # Apply dark tint for black pieces
-                    tinted = small_sprite.copy()
-                    overlay = pygame.Surface((sprite_size, sprite_size))
-                    overlay.set_alpha(80)
-                    overlay.fill((100, 50, 50))
-                    tinted.blit(overlay, (0, 0))
-                    small_sprite = tinted
-                sprite_x = x + (slot_width - sprite_size) // 2
-                sprite_y = y + (slot_height - sprite_size) // 2
-                screen.blit(small_sprite, (sprite_x, sprite_y))
+            x = area.x + 12 + col * 55
+            y = area.y + 32 + row * 60
+
+            # Draw pixel frame for slot
+            pygame.draw.rect(screen, self.palette["bg"], (x, y, slot_width, slot_height))
+            pygame.draw.rect(screen, self.palette["border"], (x, y, slot_width, slot_height), 3)
+            # Pixel corners
+            pygame.draw.rect(screen, self.palette["border"], (x, y, 7, 7))
+            pygame.draw.rect(screen, self.palette["border"], (x + slot_width - 7, y, 7, 7))
+            pygame.draw.rect(screen, self.palette["border"], (x, y + slot_height - 7, 7, 7))
+            pygame.draw.rect(screen, self.palette["border"], (x + slot_width - 7, y + slot_height - 7, 7, 7))
+
+            if i < len(reserve):
+                piece = reserve[i]
+                # Piece sprite
+                sprite = self.piece_sprites.get(piece.piece_type)
+                if sprite:
+                    sprite_size = min(slot_width - 12, slot_height - 12)
+                    small_sprite = pygame.transform.scale(sprite, (sprite_size, sprite_size))
+                    if piece.color == Color.BLACK:
+                        tinted = small_sprite.copy()
+                        overlay = pygame.Surface((sprite_size, sprite_size))
+                        overlay.set_alpha(80)
+                        overlay.fill((100, 50, 50))
+                        tinted.blit(overlay, (0, 0))
+                        small_sprite = tinted
+                    sprite_x = x + (slot_width - sprite_size) // 2
+                    sprite_y = y + (slot_height - sprite_size) // 2
+                    screen.blit(small_sprite, (sprite_x, sprite_y))
+                else:
+                    symbol = self.get_piece_symbol(piece.piece_type)
+                    symbol_surface = self.font.render(symbol, True, self.palette["white"])
+                    symbol_x = x + slot_width // 2 - symbol_surface.get_width() // 2
+                    symbol_y = y + slot_height // 2 - symbol_surface.get_height() // 2
+                    screen.blit(symbol_surface, (symbol_x, symbol_y))
+                # Tiny pixel HP bar below sprite
+                hp_bar_y = y + slot_height - 12
+                hp_bar_x = x + 8
+                hp_bar_w = slot_width - 16
+                hp_ratio = piece.hp / piece.max_hp if piece.max_hp > 0 else 0
+                hp_fill = int(hp_bar_w * hp_ratio)
+                pygame.draw.rect(screen, self.palette["neon_red"], (hp_bar_x, hp_bar_y, hp_bar_w, 6))
+                pygame.draw.rect(screen, self.palette["neon_green"], (hp_bar_x, hp_bar_y, hp_fill, 6))
+                pygame.draw.rect(screen, self.palette["white"], (hp_bar_x, hp_bar_y, hp_bar_w, 6), 1)
             else:
-                # Fallback to symbol
-                symbol = self.get_piece_symbol(piece.piece_type)
-                symbol_surface = self.small_font.render(symbol, True, (50, 50, 50))
-                symbol_x = x + slot_width // 2 - symbol_surface.get_width() // 2
-                symbol_y = y + slot_height // 2 - symbol_surface.get_height() // 2
-                screen.blit(symbol_surface, (symbol_x, symbol_y))
-            
+                # Empty slot: flickering "EMPTY" in pixel font (smaller)
+                if flicker:
+                    placeholder = "EMPTY"
+                    small_font = pygame.font.Font("Hackathon_image/pixel_font.ttf", 12)
+                    placeholder_surface = small_font.render(placeholder, True, self.palette["neon_yellow"])
+                    px = x + slot_width // 2 - placeholder_surface.get_width() // 2
+                    py = y + slot_height // 2 - placeholder_surface.get_height() // 2
+                    screen.blit(placeholder_surface, (px, py))
     def draw_shop(self, screen: pygame.Surface):
-        """Draw the shop interface"""
-        # Draw shop background
-        pygame.draw.rect(screen, (50, 50, 70), self.shop_area)
-        pygame.draw.rect(screen, (150, 150, 200), self.shop_area, 3)
-        
-        # Draw shop title
-        shop_title = "🛒 SHOP (Click to Buy)"
-        title_surface = self.font.render(shop_title, True, (255, 215, 100))
-        screen.blit(title_surface, (self.shop_area.x + 10, self.shop_area.y + 10))
-        
-        # Draw shop items in vertical layout for wider shop area
-        items_per_row = 1  # Keep vertical for better organization
-        
+        """Draw the shop interface in retro pixel-art style"""
+        # Draw shop background with pixel border
+        pygame.draw.rect(screen, self.palette["panel"], self.shop_area)
+        pygame.draw.rect(screen, self.palette["border"], self.shop_area, 4)
+        # Pixel corners
+        pixel_size = 10
+        pygame.draw.rect(screen, self.palette["border"], (self.shop_area.x, self.shop_area.y, pixel_size, pixel_size))
+        pygame.draw.rect(screen, self.palette["border"], (self.shop_area.x + self.shop_area.width - pixel_size, self.shop_area.y, pixel_size, pixel_size))
+        pygame.draw.rect(screen, self.palette["border"], (self.shop_area.x, self.shop_area.y + self.shop_area.height - pixel_size, pixel_size, pixel_size))
+        pygame.draw.rect(screen, self.palette["border"], (self.shop_area.x + self.shop_area.width - pixel_size, self.shop_area.y + self.shop_area.height - pixel_size, pixel_size, pixel_size))
+
+        # Draw shop title in pixel font
+        shop_title = "SHOP"
+        title_surface = self.title_font.render(shop_title, True, self.palette["neon_yellow"])
+        screen.blit(title_surface, (self.shop_area.x + 18, self.shop_area.y + 8))
+
+        # Draw shop items as pixel cards
         for i, piece in enumerate(self.shop_items):
-            # Vertical layout with larger items
-            x = self.shop_area.x + 10
-            y = self.shop_area.y + 40 + i * 65
-            item_width, item_height = self.shop_area.width - 20, 60
-            
-            # Draw item background
-            cost = self.get_piece_cost(piece.piece_type)
-            can_afford_white = self.white_coins >= cost
-            can_afford_black = self.black_coins >= cost
-            
-            if can_afford_white or can_afford_black:
-                bg_color = (100, 120, 100)  # Affordable
-            else:
-                bg_color = (120, 100, 100)  # Too expensive
-                
-            pygame.draw.rect(screen, bg_color, (x, y, item_width, item_height))
-            pygame.draw.rect(screen, (200, 200, 200), (x, y, item_width, item_height), 2)
-            
-            # Draw piece image or symbol
+            x = self.shop_area.x + 12
+            y = self.shop_area.y + 48 + i * 65
+            item_width, item_height = self.shop_area.width - 24, 56
+
+            # Card background and border
+            pygame.draw.rect(screen, self.palette["bg"], (x, y, item_width, item_height))
+            pygame.draw.rect(screen, self.palette["border"], (x, y, item_width, item_height), 3)
+            # Pixel corners
+            pygame.draw.rect(screen, self.palette["border"], (x, y, 8, 8))
+            pygame.draw.rect(screen, self.palette["border"], (x + item_width - 8, y, 8, 8))
+            pygame.draw.rect(screen, self.palette["border"], (x, y + item_height - 8, 8, 8))
+            pygame.draw.rect(screen, self.palette["border"], (x + item_width - 8, y + item_height - 8, 8, 8))
+
+            # Piece sprite icon
             sprite = self.piece_sprites.get(piece.piece_type)
             if sprite:
-                # Scale to fit shop slot - larger sprite
-                sprite_size = min(item_height - 10, 45)
+                sprite_size = min(item_height - 12, 32)
                 shop_sprite = pygame.transform.scale(sprite, (sprite_size, sprite_size))
-                sprite_x = x + 10
+                sprite_x = x + 12
                 sprite_y = y + (item_height - sprite_size) // 2
                 screen.blit(shop_sprite, (sprite_x, sprite_y))
-                
-                # Draw piece name and cost next to image
-                name_text = piece.piece_type.value.title()
-                name_surface = self.small_font.render(name_text, True, (255, 255, 255))
-                screen.blit(name_surface, (x + sprite_size + 20, y + 10))
-                
-                cost_text = f"{cost}🪙"
-                cost_surface = self.small_font.render(cost_text, True, (255, 255, 100))
-                screen.blit(cost_surface, (x + sprite_size + 20, y + 35))
             else:
-                # Fallback to symbol
                 symbol = self.get_piece_symbol(piece.piece_type)
-                symbol_surface = self.font.render(symbol, True, (255, 255, 255))
-                symbol_x = x + item_width // 2 - symbol_surface.get_width() // 2
-                symbol_y = y + item_height // 2 - symbol_surface.get_height() // 2
-                screen.blit(symbol_surface, (symbol_x, symbol_y))
+                symbol_surface = self.font.render(symbol, True, self.palette["white"])
+                sprite_x = x + 12
+                sprite_y = y + (item_height - 32) // 2
+                screen.blit(symbol_surface, (sprite_x, sprite_y))
+
+            # Piece name in blocky pixel font
+            name_text = piece.piece_type.value.upper()
+            name_surface = self.font.render(name_text, True, self.palette["neon_cyan"])
+            screen.blit(name_surface, (x + 60, y + 8))
+
+            # Cost in pixel font, neon yellow
+            cost = self.get_piece_cost(piece.piece_type)
+            cost_text = f"{cost}"
+            cost_surface = self.font.render(cost_text, True, self.palette["neon_yellow"])
+            screen.blit(cost_surface, (x + 60, y + 28))
+
+            # Coin sprite (user-provided)
+            try:
+                coin_img = pygame.image.load("Hackathon_image/coin.png")
+                coin_img = pygame.transform.scale(coin_img, (18, 18))
+                screen.blit(coin_img, (x + 90, y + 28))
+            except Exception:
+                pass
+
+            # Affordability: overlay red pixel PNG if not enough gold
+            can_afford_white = self.white_coins >= cost
+            can_afford_black = self.black_coins >= cost
+            if not (can_afford_white or can_afford_black):
+                try:
+                    red_overlay = pygame.image.load("Hackathon_image/red_overlay.png")
+                    red_overlay = pygame.transform.scale(red_overlay, (item_width, item_height))
+                    screen.blit(red_overlay, (x, y))
+                except Exception:
+                    # Fallback: draw solid red rectangle with alpha
+                    overlay = pygame.Surface((item_width, item_height), pygame.SRCALPHA)
+                    overlay.fill((255, 0, 0, 120))
+                    screen.blit(overlay, (x, y))
             
     def draw_shop_closed(self, screen: pygame.Surface):
         """Draw shop closed message"""
@@ -895,17 +959,41 @@ class TFTGame:
         screen.blit(info_surface, (info_x, self.shop_area.y + 90))
         
     def draw_battle_log(self, screen: pygame.Surface):
-        """Draw battle log at bottom of screen"""
-        log_area = pygame.Rect(250, 880, 720, 100)  # Bottom of screen, aligned with board width
-        pygame.draw.rect(screen, (25, 25, 40), log_area)
-        pygame.draw.rect(screen, (80, 80, 100), log_area, 2)
-        
-        log_title = self.small_font.render("📜 Battle Log", True, (255, 215, 100))
-        screen.blit(log_title, (log_area.x + 5, log_area.y + 5))
-        
-        for i, message in enumerate(self.game_log[-3:]):  # Show 3 messages to fit smaller area
-            log_surface = self.small_font.render(message, True, (180, 180, 200))
-            screen.blit(log_surface, (log_area.x + 5, log_area.y + 25 + i * 18))
+        """Draw battle log in retro terminal style with typewriter effect and color coding"""
+        log_area = pygame.Rect(250, 880, 720, 100)
+        pygame.draw.rect(screen, self.palette["black"], log_area)
+        pygame.draw.rect(screen, self.palette["neon_green"], log_area, 3)
+        pixel_size = 8
+        pygame.draw.rect(screen, self.palette["neon_green"], (log_area.x, log_area.y, pixel_size, pixel_size))
+        pygame.draw.rect(screen, self.palette["neon_green"], (log_area.x + log_area.width - pixel_size, log_area.y, pixel_size, pixel_size))
+        pygame.draw.rect(screen, self.palette["neon_green"], (log_area.x, log_area.y + log_area.height - pixel_size, pixel_size, pixel_size))
+        pygame.draw.rect(screen, self.palette["neon_green"], (log_area.x + log_area.width - pixel_size, log_area.y + log_area.height - pixel_size, pixel_size, pixel_size))
+
+        log_title = self.font.render("BATTLE LOG", True, self.palette["neon_green"])
+        screen.blit(log_title, (log_area.x + 8, log_area.y + 8))
+
+        # Typewriter effect for last message
+        messages = self.game_log[-3:]
+        typewriter_speed = 30  # ms per character
+        time_ms = pygame.time.get_ticks()
+        for i, message in enumerate(messages):
+            # Color code: red for damage, green for heals, yellow for gold
+            if "damage" in message or "attack" in message:
+                color = self.palette["neon_red"]
+            elif "heal" in message or "HP" in message:
+                color = self.palette["neon_green"]
+            elif "coin" in message or "gold" in message:
+                color = self.palette["neon_yellow"]
+            else:
+                color = self.palette["neon_green"]
+            # Typewriter effect for last message
+            if i == len(messages) - 1:
+                chars = min(len(message), (time_ms // typewriter_speed) % (len(message) + 1))
+                display_msg = message[:chars]
+            else:
+                display_msg = message
+            log_surface = self.font.render(display_msg, True, color)
+            screen.blit(log_surface, (log_area.x + 12, log_area.y + 32 + i * 22))
             
     def get_piece_symbol(self, piece_type: PieceType) -> str:
         """Get symbol for piece type"""
@@ -944,7 +1032,16 @@ class TFTGame:
         """Draw pieces using loaded images"""
         import math
         time_ms = pygame.time.get_ticks()
-        float_offset = int(6 * math.sin(time_ms / 250.0))  # 6px up/down, smooth
+
+        # Retro jump animation for selected piece (frame-step, not smooth)
+        def retro_jump_offset(frame, total_frames=3, jump_height=18):
+            # Returns y offset for jump animation (3 frames: up, peak, down)
+            if frame == 0:
+                return -jump_height
+            elif frame == 1:
+                return -jump_height // 2
+            else:
+                return 0
 
         # If combat animation is active, skip drawing attacker/defender pieces here
         anim_attacker = None
@@ -952,6 +1049,9 @@ class TFTGame:
         if self.combat_anim:
             anim_attacker = self.combat_anim["attacker"]
             anim_defender = self.combat_anim["defender"]
+
+        # Determine jump frame for selected piece
+        selected_jump_frame = ((time_ms // 80) % 3)  # 3-frame cycle, 80ms per frame
 
         for row in range(8):
             for col in range(8):
@@ -964,39 +1064,33 @@ class TFTGame:
                     x = self.board.board_offset_x + col * self.board.cell_size
                     y = self.board.board_offset_y + row * self.board.cell_size
 
-                    # Apply floating animation if selected
+                    # Snap piece to grid, apply retro jump if selected
                     is_selected = (
                         self.selected_piece is piece
                         and self.selected_row == row
                         and self.selected_col == col
                     )
-                    y_anim = y + float_offset if is_selected else y
+                    y_anim = y + retro_jump_offset(selected_jump_frame) if is_selected else y
 
                     # Get the sprite for this piece type
                     sprite = self.piece_sprites.get(piece.piece_type)
 
                     if sprite:
-                        # Scale sprite to fit cell
+                        # Nearest-neighbor scaling for pixel art
                         piece_size = self.board.cell_size - 10
                         scaled_sprite = pygame.transform.scale(sprite, (piece_size, piece_size))
-
                         # Apply color tint for different players
                         if piece.color == Color.BLACK:
-                            # Create a dark tinted version for black pieces
                             tinted_sprite = scaled_sprite.copy()
                             dark_overlay = pygame.Surface((piece_size, piece_size))
                             dark_overlay.set_alpha(100)
-                            dark_overlay.fill((100, 50, 50))  # Dark red tint
+                            dark_overlay.fill((100, 50, 50))
                             tinted_sprite.blit(dark_overlay, (0, 0))
                             scaled_sprite = tinted_sprite
-
-                        # Draw the piece
                         screen.blit(scaled_sprite, (x + 5, y_anim + 5))
-
                         # Draw piece border to distinguish colors better
                         border_color = (255, 255, 255) if piece.color == Color.WHITE else (150, 50, 50)
                         pygame.draw.rect(screen, border_color, (x + 3, y_anim + 3, piece_size + 4, piece_size + 4), 2)
-
                     else:
                         # Fallback to text rendering if image not available
                         symbol = self.get_piece_symbol(piece.piece_type)
@@ -1012,16 +1106,10 @@ class TFTGame:
                         bar_height = 6
                         bar_x = x + 10
                         bar_y = y_anim - 10
-
-                        # Background bar (red)
                         pygame.draw.rect(screen, (200, 50, 50), (bar_x, bar_y, bar_width, bar_height))
-
-                        # Health bar (green)
                         health_ratio = piece.hp / piece.max_hp
                         health_width = int(bar_width * health_ratio)
                         pygame.draw.rect(screen, (50, 200, 50), (bar_x, bar_y, health_width, bar_height))
-
-                        # Bar border
                         pygame.draw.rect(screen, (255, 255, 255), (bar_x, bar_y, bar_width, bar_height), 1)
 
     def draw_combat_animation(self, screen: pygame.Surface, anim: dict):

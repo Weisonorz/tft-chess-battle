@@ -7,7 +7,7 @@ def main():
     pygame.init()
     
     # Set up the display - larger window with better spacing
-    SCREEN_WIDTH = 1400
+    SCREEN_WIDTH = 1600
     SCREEN_HEIGHT = 1000
     screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
     pygame.display.set_caption("🏰 TFT Chess Battle ⚔️")
@@ -77,6 +77,13 @@ def main():
         # Draw controls based on current phase
         draw_phase_controls(screen, game)
         
+        # Overlay CRT scanline effect
+        try:
+            crt_overlay = pygame.image.load("Hackathon_image/crt_scanlines.png").convert_alpha()
+            screen.blit(crt_overlay, (0, 0))
+        except Exception:
+            pass
+
         # Update the display
         pygame.display.flip()
         
@@ -88,13 +95,12 @@ def main():
     sys.exit()
 
 def draw_phase_controls(screen: pygame.Surface, game: TFTGame):
-    """Draw context-sensitive controls"""
+    """Draw context-sensitive controls at the very bottom, not blocking UI"""
     font = pygame.font.Font(None, 20)
-    
-    controls_area = pygame.Rect(50, 950, 1300, 25)
+    controls_area = pygame.Rect(0, screen.get_height() - 40, screen.get_width(), 35)
     pygame.draw.rect(screen, (30, 30, 50), controls_area)
     pygame.draw.rect(screen, (100, 100, 120), controls_area, 2)
-    
+
     # Controls based on phase
     if game.phase == GamePhase.SHOP or game.phase == GamePhase.SETUP:
         controls = [
@@ -119,12 +125,12 @@ def draw_phase_controls(screen: pygame.Surface, game: TFTGame):
         ]
     else:
         controls = ["🎮 Use keyboard shortcuts to control the game"]
-    
+
     # Draw controls in a single line with larger font
     control_font = pygame.font.Font(None, 18)
     all_controls = " | ".join(controls)
     text = control_font.render(all_controls, True, (200, 200, 200))
-    screen.blit(text, (controls_area.x + 5, controls_area.y + 5))
+    screen.blit(text, (controls_area.x + 10, controls_area.y + 8))
 
 if __name__ == "__main__":
     main()
