@@ -6,6 +6,18 @@ from game import GameState
 import random
 from enum import Enum
 
+class CardType(Enum):
+    ARROW_VOLLEY = "arrow_volley"
+    DISARM = "disarm"
+
+class Card:
+    def __init__(self, card_type: CardType, immediate: bool, icon_path: str, name: str, cost: int = 3):
+        self.card_type = card_type
+        self.immediate = immediate
+        self.icon_path = icon_path
+        self.name = name
+        self.cost = cost
+
 class GamePhase(Enum):
     SETUP = "setup"
     BATTLE = "battle"
@@ -43,7 +55,11 @@ class TFTGame:
         self.black_shop_items = []  # Black's shop
         self.shop_open = True  # Shop starts open
         self.battle_ended = False
-        
+
+        # Card inventory for each player
+        self.white_card_inventory = []
+        self.black_card_inventory = []
+
         # Drag and drop state
         self.dragging_piece = None
         self.dragging_from_reserve = False
@@ -52,11 +68,12 @@ class TFTGame:
 
         # Combat animation state
         self.combat_anim = None  # None or dict with attacker, defender, start_time, type
-        
+
         # UI elements
         self.font = None
         self.title_font = None
         self.small_font = None
+        self.card_icons = {}
         self.load_assets()
         self.setup_initial_board()
         self.generate_shop()
@@ -116,6 +133,22 @@ class TFTGame:
             except Exception as e:
                 print(f"Could not load sprite for {piece_type}: {e}")
                 self.piece_sprites[piece_type] = None
+
+        # Load card icons (use placeholder if missing)
+        card_icon_files = {
+            CardType.ARROW_VOLLEY: "arrow_volley.png",
+            CardType.DISARM: "disarm.png"
+        }
+        for card_type, filename in card_icon_files.items():
+            try:
+                icon_path = f"Hackathon_image/{filename}"
+                icon = pygame.image.load(icon_path)
+                self.card_icons[card_type] = icon
+            except Exception:
+                # Placeholder: colored square
+                surf = pygame.Surface((40, 40))
+                surf.fill((200, 200, 100) if card_type == CardType.ARROW_VOLLEY else (180, 80, 80))
+                self.card_icons[card_type] = surf
                 
     def setup_initial_board(self):
         # Clear board first
@@ -137,18 +170,37 @@ class TFTGame:
         self.board.grid[1][7] = Piece(PieceType.PAWN, Color.BLACK, 1, 7)
         
     def generate_shop(self):
-        """Generate 5 random pieces for each shop"""
+        """Generate 5 random items for each shop: pieces, cards, consumables"""
         piece_types = [PieceType.PAWN, PieceType.KNIGHT, PieceType.BISHOP, 
                       PieceType.ROOK, PieceType.QUEEN]
         weights = [40, 25, 20, 10, 5]  # Pawn most common, Queen rarest
-        
+
         self.white_shop_items = []
         self.black_shop_items = []
         for _ in range(5):
-            wt = random.choices(piece_types, weights=weights)[0]
-            bt = random.choices(piece_types, weights=weights)[0]
-            self.white_shop_items.append(Piece(wt, Color.WHITE, 0, 0))
-            self.black_shop_items.append(Piece(bt, Color.BLACK, 0, 0))
+            roll = random.random()
+            if roll < 0.5:
+                # Piece (50%)
+                wt = random.choices(piece_types, weights=weights)[0]
+                bt = random.choices(piece_types, weights=weights)[0]
+                self.white_shop_items.append(Piece(wt, Color.WHITE, 0, 0))
+                self.black_shop_items.append(Piece(bt, Color.BLACK, 0, 0))
+            elif roll < 0.8:
+                # Card (30%)
+                arrow_card = Card(CardType.ARROW_VOLLEY, True, "Hackathon_image/arrow_volley.png", "Arrow Volley", 3)
+                disarm_card = Card(CardType.DISARM, False, "Hackathon_image/disarm.png", "Disarm", 3)
+                # Randomly pick one card
+                wc = random.choice([arrow_card, disarm_card])
+                bc = random.choice([arrow_card, disarm_card])
+                self.white_shop_items.append(wc)
+                self.black_shop_items.append(bc)
+            else:
+                # Consumable (20%)
+                # Placeholder: leave as is, or add your consumable logic here
+                wt = random.choices(piece_types, weights=weights)[0]
+                bt = random.choices(piece_types, weights=weights)[0]
+                self.white_shop_items.append(Piece(wt, Color.WHITE, 0, 0))
+                self.black_shop_items.append(Piece(bt, Color.BLACK, 0, 0))
             
     def get_piece_cost(self, piece_type: PieceType) -> int:
         """Get the cost of a piece type"""
@@ -169,31 +221,56 @@ class TFTGame:
         return coins >= cost
         
     def buy_piece(self, player: Color, shop_index: int) -> bool:
-        """Buy a piece from the correct shop and add to reserve"""
+        """Buy a piece or card from the correct shop and add to reserve/inventory"""
         shop_list = self.white_shop_items if player == Color.WHITE else self.black_shop_items
         if not (0 <= shop_index < len(shop_list)):
             return False
 
-        piece_template = shop_list[shop_index]
-        cost = self.get_piece_cost(piece_template.piece_type)
-
-        if not self.can_afford(player, piece_template.piece_type):
+        item = shop_list[shop_index]
+        # Handle Card purchase
+        if isinstance(item, Card):
+            cost = item.cost
+            coins = self.white_coins if player == Color.WHITE else self.black_coins
+            if coins < cost:
+                return False
+            # Deduct coins
+            if player == Color.WHITE:
+                self.white_coins -= cost
+            else:
+                self.black_coins -= cost
+            # Immediate effect
+            if item.immediate and item.card_type == CardType.ARROW_VOLLEY:
+                # Arrow Volley: deal 1 damage to all units
+                for row in range(8):
+                    for col in range(8):
+                        piece = self.board.grid[row][col]
+                        if piece and piece.is_alive():
+                            piece.hp = max(0, piece.hp - 1)
+                self.add_to_log(f"{player.value.title()} used Arrow Volley! All units take 1 damage.")
+            elif not item.immediate and item.card_type == CardType.DISARM:
+                # Disarm: add to inventory
+                if player == Color.WHITE:
+                    self.white_card_inventory.append(item)
+                else:
+                    self.black_card_inventory.append(item)
+                self.add_to_log(f"{player.value.title()} bought Disarm card (stored in inventory).")
+            # Remove from shop
+            shop_list.pop(shop_index)
+            return True
+        # Handle Piece purchase
+        cost = self.get_piece_cost(item.piece_type)
+        if not self.can_afford(player, item.piece_type):
             return False
-
-        # Deduct coins and add to reserve
         if player == Color.WHITE:
             self.white_coins -= cost
-            new_piece = Piece(piece_template.piece_type, Color.WHITE, 0, 0)
+            new_piece = Piece(item.piece_type, Color.WHITE, 0, 0)
             self.white_reserve.append(new_piece)
         else:
             self.black_coins -= cost
-            new_piece = Piece(piece_template.piece_type, Color.BLACK, 0, 0)
+            new_piece = Piece(item.piece_type, Color.BLACK, 0, 0)
             self.black_reserve.append(new_piece)
-
-        # Remove from shop
         shop_list.pop(shop_index)
-
-        self.add_to_log(f"{player.value.title()} bought {piece_template.piece_type.value.title()} for {cost} coins")
+        self.add_to_log(f"{player.value.title()} bought {item.piece_type.value.title()} for {cost} coins")
         return True
         
     def deploy_from_reserve(self, player: Color, reserve_index: int, board_row: int, board_col: int) -> bool:
@@ -759,17 +836,24 @@ class TFTGame:
         info_x = min(max(mouse_x + 20, 10), self.screen_width - info_width - 10)
         info_y = min(max(mouse_y + 20, 10), self.screen_height - info_height - 10)
         if hovered_shop_piece:
-            piece = hovered_shop_piece
+            item = hovered_shop_piece
             info_rect = pygame.Rect(info_x, info_y, info_width, info_height)
             pygame.draw.rect(screen, (30, 30, 50), info_rect)
             pygame.draw.rect(screen, (100, 255, 180), info_rect, 2)
             font = pygame.font.Font("Hackathon_image/pixel_font.ttf", 22)
-            title = f"{piece.piece_type.value.title()[:12]}"
-            hp = f"HP: {piece.hp}/{piece.max_hp}"
-            atk = f"ATK: {piece.attack}"
-            cost = f"Cost: {piece.cost}"
-            pos = "Shop Item"
-            lines = [title, hp, atk, cost, pos]
+            if isinstance(item, Card):
+                title = item.name
+                cost = f"Cost: {item.cost}"
+                card_type = "Immediate" if item.immediate else "Stored"
+                effect = "Arrow Volley: -1 HP all units" if item.card_type == CardType.ARROW_VOLLEY else "Disarm: Set attack=0"
+                lines = [title, cost, f"Type: {card_type}", effect, "Shop Card"]
+            else:
+                title = f"{item.piece_type.value.title()[:12]}"
+                hp = f"HP: {item.hp}/{item.max_hp}"
+                atk = f"ATK: {item.attack}"
+                cost = f"Cost: {item.cost}"
+                pos = "Shop Item"
+                lines = [title, hp, atk, cost, pos]
             for i, line in enumerate(lines):
                 text = font.render(line[:22], True, (255, 255, 255))
                 screen.blit(text, (info_x + 12, info_y + 12 + i * 20))
@@ -977,39 +1061,65 @@ class TFTGame:
         shop_title = "WHITE SHOP"
         title_surface = self.title_font.render(shop_title, True, self.palette["neon_yellow"])
         screen.blit(title_surface, (white_shop_rect.x + 18, white_shop_rect.y + 8))
-        for i, piece in enumerate(self.white_shop_items):
+        for i, item in enumerate(self.white_shop_items):
             x = white_shop_rect.x + 12
             y = white_shop_rect.y + 48 + i * 65
             item_width, item_height = shop_width - 24, 56
             pygame.draw.rect(screen, self.palette["bg"], (x, y, item_width, item_height))
             pygame.draw.rect(screen, self.palette["border"], (x, y, item_width, item_height), 3)
-            sprite = self.piece_sprites.get(piece.piece_type)
-            if sprite:
-                sprite_size = min(item_height - 12, 32)
-                shop_sprite = pygame.transform.scale(sprite, (sprite_size, sprite_size))
-                sprite_x = x + 12
-                sprite_y = y + (item_height - sprite_size) // 2
-                screen.blit(shop_sprite, (sprite_x, sprite_y))
+            if isinstance(item, Card):
+                # Card UI
+                icon = self.card_icons.get(item.card_type)
+                if icon:
+                    icon_size = min(item_height - 12, 32)
+                    card_icon = pygame.transform.scale(icon, (icon_size, icon_size))
+                    screen.blit(card_icon, (x + 12, y + (item_height - icon_size) // 2))
+                name_surface = self.font.render(item.name, True, self.palette["neon_cyan"])
+                screen.blit(name_surface, (x + 60, y + 8))
+                cost_text = f"{item.cost}"
+                cost_surface = self.font.render(cost_text, True, self.palette["neon_yellow"])
+                screen.blit(cost_surface, (x + 60, y + 28))
+                # Coin icon
+                try:
+                    coin_img = pygame.image.load("Hackathon_image/coin.png")
+                    coin_img = pygame.transform.scale(coin_img, (18, 18))
+                    screen.blit(coin_img, (x + 90, y + 28))
+                except Exception:
+                    pass
+                # Immediate card icon
+                if item.immediate:
+                    flash_surface = self.font.render("⚡", True, (255, 255, 80))
+                    screen.blit(flash_surface, (x + item_width - 32, y + 8))
+                can_afford = self.white_coins >= item.cost
             else:
-                symbol = self.get_piece_symbol(piece.piece_type)
-                symbol_surface = self.font.render(symbol, True, self.palette["white"])
-                sprite_x = x + 12
-                sprite_y = y + (item_height - 32) // 2
-                screen.blit(symbol_surface, (sprite_x, sprite_y))
-            name_text = piece.piece_type.value.upper()
-            name_surface = self.font.render(name_text, True, self.palette["neon_cyan"])
-            screen.blit(name_surface, (x + 60, y + 8))
-            cost = self.get_piece_cost(piece.piece_type)
-            cost_text = f"{cost}"
-            cost_surface = self.font.render(cost_text, True, self.palette["neon_yellow"])
-            screen.blit(cost_surface, (x + 60, y + 28))
-            try:
-                coin_img = pygame.image.load("Hackathon_image/coin.png")
-                coin_img = pygame.transform.scale(coin_img, (18, 18))
-                screen.blit(coin_img, (x + 90, y + 28))
-            except Exception:
-                pass
-            can_afford = self.white_coins >= cost
+                # Piece/consumable UI
+                sprite = self.piece_sprites.get(item.piece_type)
+                if sprite:
+                    sprite_size = min(item_height - 12, 32)
+                    shop_sprite = pygame.transform.scale(sprite, (sprite_size, sprite_size))
+                    sprite_x = x + 12
+                    sprite_y = y + (item_height - sprite_size) // 2
+                    screen.blit(shop_sprite, (sprite_x, sprite_y))
+                else:
+                    symbol = self.get_piece_symbol(item.piece_type)
+                    symbol_surface = self.font.render(symbol, True, self.palette["white"])
+                    sprite_x = x + 12
+                    sprite_y = y + (item_height - 32) // 2
+                    screen.blit(symbol_surface, (sprite_x, sprite_y))
+                name_text = item.piece_type.value.upper()
+                name_surface = self.font.render(name_text, True, self.palette["neon_cyan"])
+                screen.blit(name_surface, (x + 60, y + 8))
+                cost = self.get_piece_cost(item.piece_type)
+                cost_text = f"{cost}"
+                cost_surface = self.font.render(cost_text, True, self.palette["neon_yellow"])
+                screen.blit(cost_surface, (x + 60, y + 28))
+                try:
+                    coin_img = pygame.image.load("Hackathon_image/coin.png")
+                    coin_img = pygame.transform.scale(coin_img, (18, 18))
+                    screen.blit(coin_img, (x + 90, y + 28))
+                except Exception:
+                    pass
+                can_afford = self.white_coins >= cost
             if not can_afford:
                 try:
                     red_overlay = pygame.image.load("Hackathon_image/red_overlay.png")
@@ -1026,39 +1136,65 @@ class TFTGame:
         shop_title = "BLACK SHOP"
         title_surface = self.title_font.render(shop_title, True, self.palette["neon_yellow"])
         screen.blit(title_surface, (black_shop_rect.x + 18, black_shop_rect.y + 8))
-        for i, piece in enumerate(self.black_shop_items):
+        for i, item in enumerate(self.black_shop_items):
             x = black_shop_rect.x + 12
             y = black_shop_rect.y + 48 + i * 65
             item_width, item_height = shop_width - 24, 56
             pygame.draw.rect(screen, self.palette["bg"], (x, y, item_width, item_height))
             pygame.draw.rect(screen, self.palette["border"], (x, y, item_width, item_height), 3)
-            sprite = self.piece_sprites.get(piece.piece_type)
-            if sprite:
-                sprite_size = min(item_height - 12, 32)
-                shop_sprite = pygame.transform.scale(sprite, (sprite_size, sprite_size))
-                sprite_x = x + 12
-                sprite_y = y + (item_height - sprite_size) // 2
-                screen.blit(shop_sprite, (sprite_x, sprite_y))
+            if isinstance(item, Card):
+                # Card UI
+                icon = self.card_icons.get(item.card_type)
+                if icon:
+                    icon_size = min(item_height - 12, 32)
+                    card_icon = pygame.transform.scale(icon, (icon_size, icon_size))
+                    screen.blit(card_icon, (x + 12, y + (item_height - icon_size) // 2))
+                name_surface = self.font.render(item.name, True, self.palette["neon_cyan"])
+                screen.blit(name_surface, (x + 60, y + 8))
+                cost_text = f"{item.cost}"
+                cost_surface = self.font.render(cost_text, True, self.palette["neon_yellow"])
+                screen.blit(cost_surface, (x + 60, y + 28))
+                # Coin icon
+                try:
+                    coin_img = pygame.image.load("Hackathon_image/coin.png")
+                    coin_img = pygame.transform.scale(coin_img, (18, 18))
+                    screen.blit(coin_img, (x + 90, y + 28))
+                except Exception:
+                    pass
+                # Immediate card icon
+                if item.immediate:
+                    flash_surface = self.font.render("⚡", True, (255, 255, 80))
+                    screen.blit(flash_surface, (x + item_width - 32, y + 8))
+                can_afford = self.black_coins >= item.cost
             else:
-                symbol = self.get_piece_symbol(piece.piece_type)
-                symbol_surface = self.font.render(symbol, True, self.palette["white"])
-                sprite_x = x + 12
-                sprite_y = y + (item_height - 32) // 2
-                screen.blit(symbol_surface, (sprite_x, sprite_y))
-            name_text = piece.piece_type.value.upper()
-            name_surface = self.font.render(name_text, True, self.palette["neon_cyan"])
-            screen.blit(name_surface, (x + 60, y + 8))
-            cost = self.get_piece_cost(piece.piece_type)
-            cost_text = f"{cost}"
-            cost_surface = self.font.render(cost_text, True, self.palette["neon_yellow"])
-            screen.blit(cost_surface, (x + 60, y + 28))
-            try:
-                coin_img = pygame.image.load("Hackathon_image/coin.png")
-                coin_img = pygame.transform.scale(coin_img, (18, 18))
-                screen.blit(coin_img, (x + 90, y + 28))
-            except Exception:
-                pass
-            can_afford = self.black_coins >= cost
+                # Piece/consumable UI
+                sprite = self.piece_sprites.get(item.piece_type)
+                if sprite:
+                    sprite_size = min(item_height - 12, 32)
+                    shop_sprite = pygame.transform.scale(sprite, (sprite_size, sprite_size))
+                    sprite_x = x + 12
+                    sprite_y = y + (item_height - sprite_size) // 2
+                    screen.blit(shop_sprite, (sprite_x, sprite_y))
+                else:
+                    symbol = self.get_piece_symbol(item.piece_type)
+                    symbol_surface = self.font.render(symbol, True, self.palette["white"])
+                    sprite_x = x + 12
+                    sprite_y = y + (item_height - 32) // 2
+                    screen.blit(symbol_surface, (sprite_x, sprite_y))
+                name_text = item.piece_type.value.upper()
+                name_surface = self.font.render(name_text, True, self.palette["neon_cyan"])
+                screen.blit(name_surface, (x + 60, y + 8))
+                cost = self.get_piece_cost(item.piece_type)
+                cost_text = f"{cost}"
+                cost_surface = self.font.render(cost_text, True, self.palette["neon_yellow"])
+                screen.blit(cost_surface, (x + 60, y + 28))
+                try:
+                    coin_img = pygame.image.load("Hackathon_image/coin.png")
+                    coin_img = pygame.transform.scale(coin_img, (18, 18))
+                    screen.blit(coin_img, (x + 90, y + 28))
+                except Exception:
+                    pass
+                can_afford = self.black_coins >= cost
             if not can_afford:
                 try:
                     red_overlay = pygame.image.load("Hackathon_image/red_overlay.png")
