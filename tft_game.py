@@ -703,10 +703,6 @@ class TFTGame:
         if all(self.actions_taken.values()):
             self.end_battle_phase()
 
-        self.actions_taken[self.current_player] = True
-        if all(self.actions_taken.values()):
-            self.end_battle_phase()
-
         # Handle combat after animation (delayed)
         # The actual damage and removal will be handled after animation in draw()
 
