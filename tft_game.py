@@ -1,0 +1,785 @@
+import pygame
+from typing import Optional, List, Tuple, Dict
+from board import Board
+from piece import Piece, Color, PieceType
+from game import GameState
+import random
+from enum import Enum
+
+class GamePhase(Enum):
+    SETUP = "setup"
+    BATTLE = "battle"
+    SHOP = "shop"
+    END_ROUND = "end_round"
+
+class TFTGame:
+    def __init__(self):
+        self.board = Board()
+        self.current_player = Color.WHITE
+        self.selected_piece = None
+        self.selected_row = -1
+        self.selected_col = -1
+        self.valid_moves = []
+        self.attack_targets = []
+        self.game_state = GameState.PLAYING
+        self.action_mode = "move"
+        self.game_log = []
+        
+        # TFT-specific systems
+        self.round_number = 1
+        self.phase = GamePhase.SETUP
+        self.white_coins = 3  # Starting coins
+        self.black_coins = 3
+        self.white_reserve = []  # Reserve pieces
+        self.black_reserve = []
+        self.shop_items = []  # Available pieces in shop
+        self.shop_open = True  # Shop starts open
+        self.battle_ended = False
+        
+        # UI elements
+        self.font = None
+        self.title_font = None
+        self.small_font = None
+        self.load_assets()
+        self.setup_initial_board()
+        self.generate_shop()
+        
+        # UI layout - completely redesigned to avoid board blocking
+        # Board is at (200, 120) with size 640x640 (8*80)
+        self.white_reserve_area = pygame.Rect(50, 120, 130, 500)   # Left side of board
+        self.black_reserve_area = pygame.Rect(860, 120, 130, 300)  # Right side of board, top
+        self.shop_area = pygame.Rect(860, 440, 130, 300)           # Right side of board, bottom
+        
+    def load_assets(self):
+        pygame.font.init()
+        self.font = pygame.font.Font(None, 24)
+        self.title_font = pygame.font.Font(None, 32)
+        self.small_font = pygame.font.Font(None, 18)
+        
+        # Load piece sprites from Hackathon_image directory
+        self.piece_sprites = {}
+        piece_files = {
+            PieceType.PAWN: "pawn.png",
+            PieceType.KNIGHT: "knight.png", 
+            PieceType.BISHOP: "king1.png",  # Using king1 as bishop
+            PieceType.ROOK: "king2.png",    # Using king2 as rook
+            PieceType.QUEEN: "queen.png",
+            PieceType.KING: "king.png"
+        }
+        
+        for piece_type, filename in piece_files.items():
+            try:
+                sprite_path = f"Hackathon_image/{filename}"
+                sprite = pygame.image.load(sprite_path)
+                self.piece_sprites[piece_type] = sprite
+                print(f"Loaded sprite for {piece_type.value}")
+            except Exception as e:
+                print(f"Could not load sprite for {piece_type}: {e}")
+                self.piece_sprites[piece_type] = None
+                
+    def setup_initial_board(self):
+        # Clear board first
+        self.board.grid = [[None for _ in range(8)] for _ in range(8)]
+        
+        # Setup initial pieces: 4 pawns + 1 king per side
+        # White pieces (bottom)
+        self.board.grid[7][2] = Piece(PieceType.KING, Color.WHITE, 7, 2)
+        self.board.grid[6][1] = Piece(PieceType.PAWN, Color.WHITE, 6, 1)
+        self.board.grid[6][2] = Piece(PieceType.PAWN, Color.WHITE, 6, 2)
+        self.board.grid[6][3] = Piece(PieceType.PAWN, Color.WHITE, 6, 3)
+        self.board.grid[6][4] = Piece(PieceType.PAWN, Color.WHITE, 6, 4)
+        
+        # Black pieces (top)
+        self.board.grid[0][5] = Piece(PieceType.KING, Color.BLACK, 0, 5)
+        self.board.grid[1][4] = Piece(PieceType.PAWN, Color.BLACK, 1, 4)
+        self.board.grid[1][5] = Piece(PieceType.PAWN, Color.BLACK, 1, 5)
+        self.board.grid[1][6] = Piece(PieceType.PAWN, Color.BLACK, 1, 6)
+        self.board.grid[1][7] = Piece(PieceType.PAWN, Color.BLACK, 1, 7)
+        
+    def generate_shop(self):
+        """Generate 5 random pieces for the shop"""
+        piece_types = [PieceType.PAWN, PieceType.KNIGHT, PieceType.BISHOP, 
+                      PieceType.ROOK, PieceType.QUEEN]
+        weights = [40, 25, 20, 10, 5]  # Pawn most common, Queen rarest
+        
+        self.shop_items = []
+        for _ in range(5):
+            piece_type = random.choices(piece_types, weights=weights)[0]
+            # Create a neutral piece for display
+            piece = Piece(piece_type, Color.WHITE, 0, 0)  # Will be recolored when bought
+            self.shop_items.append(piece)
+            
+    def get_piece_cost(self, piece_type: PieceType) -> int:
+        """Get the cost of a piece type"""
+        costs = {
+            PieceType.PAWN: 1,
+            PieceType.KNIGHT: 3,
+            PieceType.BISHOP: 3,
+            PieceType.ROOK: 5,
+            PieceType.QUEEN: 9,
+            PieceType.KING: 99  # Can't buy kings
+        }
+        return costs.get(piece_type, 99)
+        
+    def can_afford(self, player: Color, piece_type: PieceType) -> bool:
+        """Check if player can afford a piece"""
+        cost = self.get_piece_cost(piece_type)
+        coins = self.white_coins if player == Color.WHITE else self.black_coins
+        return coins >= cost
+        
+    def buy_piece(self, player: Color, shop_index: int) -> bool:
+        """Buy a piece from shop and add to reserve"""
+        if not (0 <= shop_index < len(self.shop_items)):
+            return False
+            
+        piece_template = self.shop_items[shop_index]
+        cost = self.get_piece_cost(piece_template.piece_type)
+        
+        if not self.can_afford(player, piece_template.piece_type):
+            return False
+            
+        # Deduct coins
+        if player == Color.WHITE:
+            self.white_coins -= cost
+            # Create piece for white player
+            new_piece = Piece(piece_template.piece_type, Color.WHITE, 0, 0)
+            self.white_reserve.append(new_piece)
+        else:
+            self.black_coins -= cost
+            # Create piece for black player  
+            new_piece = Piece(piece_template.piece_type, Color.BLACK, 0, 0)
+            self.black_reserve.append(new_piece)
+            
+        # Remove from shop and replace
+        self.shop_items.pop(shop_index)
+        
+        # Add new item to shop
+        piece_types = [PieceType.PAWN, PieceType.KNIGHT, PieceType.BISHOP, 
+                      PieceType.ROOK, PieceType.QUEEN]
+        weights = [40, 25, 20, 10, 5]
+        new_type = random.choices(piece_types, weights=weights)[0]
+        new_shop_piece = Piece(new_type, Color.WHITE, 0, 0)
+        self.shop_items.insert(shop_index, new_shop_piece)
+        
+        self.add_to_log(f"{player.value.title()} bought {piece_template.piece_type.value.title()} for {cost} coins")
+        return True
+        
+    def deploy_from_reserve(self, player: Color, reserve_index: int, board_row: int, board_col: int) -> bool:
+        """Deploy piece from reserve to board"""
+        if player == Color.WHITE:
+            if not (0 <= reserve_index < len(self.white_reserve)):
+                return False
+            piece = self.white_reserve[reserve_index]
+            # Check if position is in white's deployment zone (rows 5-7)
+            if not (5 <= board_row <= 7):
+                return False
+        else:
+            if not (0 <= reserve_index < len(self.black_reserve)):
+                return False
+            piece = self.black_reserve[reserve_index]
+            # Check if position is in black's deployment zone (rows 0-2)
+            if not (0 <= board_row <= 2):
+                return False
+                
+        # Check if target position is empty
+        if self.board.grid[board_row][board_col] is not None:
+            return False
+            
+        # Deploy piece
+        piece.row = board_row
+        piece.col = board_col
+        self.board.grid[board_row][board_col] = piece
+        
+        # Remove from reserve
+        if player == Color.WHITE:
+            self.white_reserve.remove(piece)
+        else:
+            self.black_reserve.remove(piece)
+            
+        self.add_to_log(f"{player.value.title()} deployed {piece.piece_type.value.title()}")
+        return True
+        
+    def start_battle_phase(self):
+        """Start the battle phase"""
+        self.phase = GamePhase.BATTLE
+        self.shop_open = False
+        self.battle_ended = False
+        self.current_player = Color.WHITE
+        self.add_to_log(f"Round {self.round_number} Battle begins!")
+        
+    def end_battle_phase(self):
+        """End battle and distribute rewards"""
+        self.phase = GamePhase.END_ROUND
+        self.battle_ended = True
+        
+        # Give base income
+        self.white_coins += 1
+        self.black_coins += 1
+        
+        self.add_to_log(f"Round {self.round_number} ended! +1 coin to both players")
+        
+    def start_next_round(self):
+        """Start the next round"""
+        self.round_number += 1
+        
+        # Shop opens every 3 rounds
+        if self.round_number % 3 == 1:
+            self.shop_open = True
+            self.phase = GamePhase.SHOP
+            self.generate_shop()  # Refresh shop
+            self.add_to_log(f"Round {self.round_number}: Shop is open!")
+        else:
+            self.shop_open = False
+            self.phase = GamePhase.SETUP
+            self.add_to_log(f"Round {self.round_number}: Prepare for battle")
+            
+        self.battle_ended = False
+        
+    def handle_piece_death(self, dead_piece: Piece, killer_color: Color):
+        """Handle when a piece dies, giving coins to killer"""
+        reward = self.get_piece_cost(dead_piece.piece_type) // 2  # Half the piece cost
+        if reward < 1:
+            reward = 1
+            
+        if killer_color == Color.WHITE:
+            self.white_coins += reward
+            self.add_to_log(f"White gains {reward} coins for killing {dead_piece.piece_type.value.title()}")
+        else:
+            self.black_coins += reward
+            self.add_to_log(f"Black gains {reward} coins for killing {dead_piece.piece_type.value.title()}")
+            
+    def add_to_log(self, message: str):
+        """Add message to game log"""
+        self.game_log.append(message)
+        if len(self.game_log) > 8:
+            self.game_log.pop(0)
+            
+    # Add methods from original game for compatibility
+    def handle_click(self, mouse_x: int, mouse_y: int):
+        """Handle mouse clicks - extended for TFT features"""
+        # Handle shop clicks
+        if self.shop_open and self.shop_area.collidepoint(mouse_x, mouse_y):
+            self.handle_shop_click(mouse_x, mouse_y)
+            return
+            
+        # Handle reserve clicks
+        if self.white_reserve_area.collidepoint(mouse_x, mouse_y):
+            self.handle_reserve_click(mouse_x, mouse_y, Color.WHITE)
+            return
+        elif self.black_reserve_area.collidepoint(mouse_x, mouse_y):
+            self.handle_reserve_click(mouse_x, mouse_y, Color.BLACK)
+            return
+            
+        # Handle board clicks 
+        # Check if click is in board area
+        board_area = pygame.Rect(
+            self.board.board_offset_x,
+            self.board.board_offset_y,
+            8 * self.board.cell_size,
+            8 * self.board.cell_size
+        )
+        
+        if board_area.collidepoint(mouse_x, mouse_y):
+            self.handle_board_click(mouse_x, mouse_y)
+            return
+            
+    def handle_shop_click(self, mouse_x: int, mouse_y: int):
+        """Handle clicks on shop items"""
+        if not self.shop_open:
+            return
+            
+        # Calculate which shop item was clicked
+        relative_x = mouse_x - self.shop_area.x
+        relative_y = mouse_y - self.shop_area.y
+        
+        items_per_row = 1 if self.shop_area.width < 200 else 5
+        
+        if items_per_row == 1:  # Vertical layout
+            if relative_y >= 40:  # Below title
+                shop_index = (relative_y - 40) // 50
+            else:
+                shop_index = -1
+        else:  # Horizontal layout
+            if 40 <= relative_y <= 120:  # Shop items row
+                shop_index = relative_x // 80
+            else:
+                shop_index = -1
+                
+        if 0 <= shop_index < len(self.shop_items):
+            # Try to buy for current player
+            self.buy_piece(self.current_player, shop_index)
+                
+    def handle_reserve_click(self, mouse_x: int, mouse_y: int, player: Color):
+        """Handle clicks on reserve area"""
+        # For now, just select pieces - deployment will be handled separately
+        pass
+        
+    def handle_board_click(self, mouse_x: int, mouse_y: int):
+        """Handle clicks on the game board"""
+        # Allow movement during BATTLE phase, and also during SETUP for positioning
+        if self.phase not in [GamePhase.BATTLE, GamePhase.SETUP]:
+            return
+            
+        row, col = self.board.get_cell_from_mouse(mouse_x, mouse_y)
+        
+        if not self.board.is_valid_position(row, col):
+            return
+            
+        clicked_piece = self.board.get_piece_at(row, col)
+        
+        # If no piece is selected
+        if self.selected_piece is None:
+            # Only allow selecting pieces belonging to current player
+            if clicked_piece and clicked_piece.is_alive() and clicked_piece.color == self.current_player:
+                self.select_piece(clicked_piece, row, col)
+        else:
+            # If clicking on the same piece, deselect
+            if row == self.selected_row and col == self.selected_col:
+                self.deselect_piece()
+            # If clicking on a valid move
+            elif (row, col) in self.valid_moves and self.action_mode == "move":
+                self.make_move(self.selected_row, self.selected_col, row, col)
+            # If clicking on a valid attack target
+            elif (row, col) in self.attack_targets and self.action_mode == "attack":
+                self.make_attack(self.selected_row, self.selected_col, row, col)
+            # If clicking on another piece of the current player
+            elif clicked_piece and clicked_piece.is_alive() and clicked_piece.color == self.current_player:
+                self.select_piece(clicked_piece, row, col)
+            else:
+                self.deselect_piece()
+    
+    def select_piece(self, piece: Piece, row: int, col: int):
+        """Select a piece for movement/attack"""
+        self.selected_piece = piece
+        self.selected_row = row
+        self.selected_col = col
+        self.valid_moves = piece.get_valid_moves(self.board.grid)
+        self.attack_targets = piece.get_attack_targets(self.board.grid)
+        self.action_mode = "move"
+        
+    def deselect_piece(self):
+        """Deselect current piece"""
+        self.selected_piece = None
+        self.selected_row = -1
+        self.selected_col = -1
+        self.valid_moves = []
+        self.attack_targets = []
+        self.action_mode = "move"
+        
+    def make_move(self, from_row: int, from_col: int, to_row: int, to_col: int):
+        """Move a piece"""
+        moving_piece = self.board.get_piece_at(from_row, from_col)
+        
+        if not moving_piece or not moving_piece.is_alive():
+            return
+            
+        # Move the piece (should only be to empty squares)
+        target_piece = self.board.get_piece_at(to_row, to_col)
+        if target_piece is None:  # Only move to empty squares
+            self.board.move_piece(from_row, from_col, to_row, to_col)
+            
+        self.deselect_piece()
+        self.switch_player()
+        self.check_battle_end()
+    
+    def make_attack(self, attacker_row: int, attacker_col: int, target_row: int, target_col: int):
+        """Attack an enemy piece"""
+        attacking_piece = self.board.get_piece_at(attacker_row, attacker_col)
+        target_piece = self.board.get_piece_at(target_row, target_col)
+        
+        if not attacking_piece or not attacking_piece.is_alive():
+            return
+        if not target_piece or not target_piece.is_alive():
+            return
+            
+        # Check if attack is valid
+        if not attacking_piece.can_attack(target_row, target_col, self.board.grid):
+            return
+            
+        # Handle combat
+        self.handle_combat(attacking_piece, target_piece)
+        
+        # Remove dead pieces and give rewards
+        if not target_piece.is_alive():
+            self.board.grid[target_row][target_col] = None
+            self.handle_piece_death(target_piece, attacking_piece.color)
+            
+        self.deselect_piece()
+        self.switch_player()
+        self.check_battle_end()
+    
+    def handle_combat(self, attacker: Piece, defender: Piece):
+        """Handle combat between two pieces"""
+        # Attacker deals damage to defender
+        defender.take_damage(attacker.attack)
+        combat_msg = f"{attacker.color.value.title()} {attacker.piece_type.value.title()} attacks {defender.color.value.title()} {defender.piece_type.value.title()} for {attacker.attack} damage"
+        self.add_to_log(combat_msg)
+        
+        # Check if defender is destroyed
+        if not defender.is_alive():
+            death_msg = f"{defender.color.value.title()} {defender.piece_type.value.title()} is destroyed!"
+            self.add_to_log(death_msg)
+        else:
+            hp_msg = f"{defender.color.value.title()} {defender.piece_type.value.title()} has {defender.hp}/{defender.max_hp} HP remaining"
+            self.add_to_log(hp_msg)
+    
+    def switch_player(self):
+        """Switch to the other player"""
+        self.current_player = Color.BLACK if self.current_player == Color.WHITE else Color.WHITE
+        turn_msg = f"{self.current_player.value.title()}'s turn"
+        self.add_to_log(turn_msg)
+    
+    def check_battle_end(self):
+        """Check if battle should end"""
+        # Only check for battle end during battle phase
+        if self.phase != GamePhase.BATTLE:
+            return
+            
+        white_king_alive = self.board.is_king_alive(Color.WHITE)
+        black_king_alive = self.board.is_king_alive(Color.BLACK)
+        
+        if not white_king_alive:
+            self.add_to_log("BLACK WINS THE BATTLE! White King defeated!")
+            self.black_coins += 3  # Bonus for winning
+            self.end_battle_phase()
+        elif not black_king_alive:
+            self.add_to_log("WHITE WINS THE BATTLE! Black King defeated!")
+            self.white_coins += 3  # Bonus for winning
+            self.end_battle_phase()
+    
+    def toggle_action_mode(self):
+        """Toggle between move and attack modes"""
+        if self.selected_piece:
+            self.action_mode = "attack" if self.action_mode == "move" else "move"
+            mode_msg = f"Switched to {self.action_mode.upper()} mode"
+            self.add_to_log(mode_msg)
+        
+    def draw(self, screen: pygame.Surface):
+        """Draw the complete TFT game"""
+        # Clear screen
+        screen.fill((15, 20, 35))
+        
+        # Draw board without background image
+        self.draw_simple_board(screen)
+        
+        # Draw highlights during battle and setup phases
+        if self.phase in [GamePhase.BATTLE, GamePhase.SETUP] and self.selected_piece:
+            self.board.highlight_cell(screen, self.selected_row, self.selected_col, (255, 255, 0))
+            
+            # Highlight valid moves and attack targets based on current mode
+            if self.action_mode == "move":
+                self.board.highlight_moves(screen, self.valid_moves)  # Green for moves
+            elif self.action_mode == "attack":
+                # Red for attack targets
+                for row, col in self.attack_targets:
+                    self.board.highlight_cell(screen, row, col, (255, 100, 100))
+        
+        # Draw pieces with custom rendering using loaded images
+        self.draw_pieces_with_images(screen)
+        
+        # Draw UI elements
+        self.draw_tft_ui(screen)
+        
+    def draw_tft_ui(self, screen: pygame.Surface):
+        """Draw TFT-specific UI elements"""
+        # Draw title
+        title_text = f"🏰 TFT Chess Battle - Round {self.round_number} 🏰"
+        title_surface = self.title_font.render(title_text, True, (255, 215, 100))
+        title_x = screen.get_width() // 2 - title_surface.get_width() // 2
+        screen.blit(title_surface, (title_x, 10))
+        
+        # Draw phase and turn indicator
+        phase_text = f"Phase: {self.phase.value.upper()}"
+        phase_surface = self.font.render(phase_text, True, (200, 200, 255))
+        screen.blit(phase_surface, (50, 40))
+        
+        # Draw current player turn
+        turn_color = (255, 255, 100) if self.current_player == Color.WHITE else (255, 150, 150)
+        turn_text = f"Turn: {self.current_player.value.upper()}"
+        turn_surface = self.font.render(turn_text, True, turn_color)
+        screen.blit(turn_surface, (200, 40))
+        
+        # Draw action mode if piece is selected
+        if self.selected_piece:
+            mode_color = (100, 255, 100) if self.action_mode == "move" else (255, 100, 100)
+            mode_text = f"Mode: {self.action_mode.upper()}"
+            mode_surface = self.font.render(mode_text, True, mode_color)
+            screen.blit(mode_surface, (350, 40))
+        
+        # Draw coins
+        white_coins_text = f"White: {self.white_coins} 🪙"
+        black_coins_text = f"Black: {self.black_coins} 🪙"
+        
+        white_surface = self.font.render(white_coins_text, True, (255, 255, 255))
+        black_surface = self.font.render(black_coins_text, True, (255, 150, 150))
+        
+        screen.blit(white_surface, (700, 50))
+        screen.blit(black_surface, (700, 75))
+        
+        # Draw reserve areas
+        self.draw_reserve_area(screen, self.white_reserve_area, self.white_reserve, Color.WHITE)
+        self.draw_reserve_area(screen, self.black_reserve_area, self.black_reserve, Color.BLACK)
+        
+        # Draw shop
+        if self.shop_open:
+            self.draw_shop(screen)
+        else:
+            self.draw_shop_closed(screen)
+            
+        # Draw battle log (smaller)
+        self.draw_battle_log(screen)
+        
+    def draw_reserve_area(self, screen: pygame.Surface, area: pygame.Rect, reserve: List[Piece], player: Color):
+        """Draw reserve area for a player"""
+        # Draw background
+        color = (40, 60, 80) if player == Color.WHITE else (80, 40, 40)
+        pygame.draw.rect(screen, color, area)
+        pygame.draw.rect(screen, (150, 150, 150), area, 2)
+        
+        # Draw label
+        label = f"{player.value.title()} Reserve ({len(reserve)}/8)"
+        label_surface = self.small_font.render(label, True, (255, 255, 255))
+        screen.blit(label_surface, (area.x + 5, area.y + 5))
+        
+        # Draw reserve pieces in vertical layout
+        pieces_per_row = 2 if area.width < 200 else 8  # Vertical layout for narrow areas
+        
+        for i, piece in enumerate(reserve[:8]):  # Max 8 in reserve
+            if pieces_per_row == 2:  # Vertical layout
+                col = i % 2
+                row = i // 2
+                x = area.x + 5 + col * 60
+                y = area.y + 25 + row * 55
+                slot_width, slot_height = 55, 50
+            else:  # Horizontal layout
+                x = area.x + 5 + i * 70
+                y = area.y + 20
+                slot_width, slot_height = 60, 40
+            
+            # Draw piece background
+            piece_color = (200, 200, 220) if player == Color.WHITE else (220, 150, 150)
+            pygame.draw.rect(screen, piece_color, (x, y, slot_width, slot_height))
+            pygame.draw.rect(screen, (100, 100, 100), (x, y, slot_width, slot_height), 1)
+            
+            # Use actual piece image if available
+            sprite = self.piece_sprites.get(piece.piece_type)
+            if sprite:
+                # Scale to fit reserve slot
+                sprite_size = min(slot_width - 10, slot_height - 10)
+                small_sprite = pygame.transform.scale(sprite, (sprite_size, sprite_size))
+                if piece.color == Color.BLACK:
+                    # Apply dark tint for black pieces
+                    tinted = small_sprite.copy()
+                    overlay = pygame.Surface((sprite_size, sprite_size))
+                    overlay.set_alpha(80)
+                    overlay.fill((100, 50, 50))
+                    tinted.blit(overlay, (0, 0))
+                    small_sprite = tinted
+                sprite_x = x + (slot_width - sprite_size) // 2
+                sprite_y = y + (slot_height - sprite_size) // 2
+                screen.blit(small_sprite, (sprite_x, sprite_y))
+            else:
+                # Fallback to symbol
+                symbol = self.get_piece_symbol(piece.piece_type)
+                symbol_surface = self.small_font.render(symbol, True, (50, 50, 50))
+                symbol_x = x + slot_width // 2 - symbol_surface.get_width() // 2
+                symbol_y = y + slot_height // 2 - symbol_surface.get_height() // 2
+                screen.blit(symbol_surface, (symbol_x, symbol_y))
+            
+    def draw_shop(self, screen: pygame.Surface):
+        """Draw the shop interface"""
+        # Draw shop background
+        pygame.draw.rect(screen, (50, 50, 70), self.shop_area)
+        pygame.draw.rect(screen, (150, 150, 200), self.shop_area, 3)
+        
+        # Draw shop title
+        shop_title = "🛒 SHOP (Click to Buy)"
+        title_surface = self.font.render(shop_title, True, (255, 215, 100))
+        screen.blit(title_surface, (self.shop_area.x + 10, self.shop_area.y + 10))
+        
+        # Draw shop items in vertical layout for narrow shop
+        items_per_row = 1 if self.shop_area.width < 200 else 5
+        
+        for i, piece in enumerate(self.shop_items):
+            if items_per_row == 1:  # Vertical layout
+                x = self.shop_area.x + 10
+                y = self.shop_area.y + 40 + i * 50
+                item_width, item_height = self.shop_area.width - 20, 45
+            else:  # Horizontal layout
+                x = self.shop_area.x + 10 + i * 80
+                y = self.shop_area.y + 40
+                item_width, item_height = 70, 80
+            
+            # Draw item background
+            cost = self.get_piece_cost(piece.piece_type)
+            can_afford_white = self.white_coins >= cost
+            can_afford_black = self.black_coins >= cost
+            
+            if can_afford_white or can_afford_black:
+                bg_color = (100, 120, 100)  # Affordable
+            else:
+                bg_color = (120, 100, 100)  # Too expensive
+                
+            pygame.draw.rect(screen, bg_color, (x, y, item_width, item_height))
+            pygame.draw.rect(screen, (200, 200, 200), (x, y, item_width, item_height), 2)
+            
+            # Draw piece image or symbol
+            sprite = self.piece_sprites.get(piece.piece_type)
+            if sprite:
+                # Scale to fit shop slot
+                sprite_size = min(item_height - 10, 35)
+                shop_sprite = pygame.transform.scale(sprite, (sprite_size, sprite_size))
+                sprite_x = x + 5
+                sprite_y = y + (item_height - sprite_size) // 2
+                screen.blit(shop_sprite, (sprite_x, sprite_y))
+                
+                # Draw piece name and cost next to image (for vertical layout)
+                if items_per_row == 1:
+                    name_text = piece.piece_type.value.title()
+                    name_surface = self.small_font.render(name_text, True, (255, 255, 255))
+                    screen.blit(name_surface, (x + sprite_size + 10, y + 5))
+                    
+                    cost_text = f"{cost}🪙"
+                    cost_surface = self.small_font.render(cost_text, True, (255, 255, 100))
+                    screen.blit(cost_surface, (x + sprite_size + 10, y + 25))
+                else:
+                    # Horizontal layout - cost below
+                    cost_text = f"{cost}🪙"
+                    cost_surface = self.small_font.render(cost_text, True, (255, 255, 100))
+                    cost_x = x + item_width // 2 - cost_surface.get_width() // 2
+                    screen.blit(cost_surface, (cost_x, y + item_height - 20))
+            else:
+                # Fallback to symbol
+                symbol = self.get_piece_symbol(piece.piece_type)
+                symbol_surface = self.font.render(symbol, True, (255, 255, 255))
+                symbol_x = x + item_width // 2 - symbol_surface.get_width() // 2
+                symbol_y = y + item_height // 2 - symbol_surface.get_height() // 2
+                screen.blit(symbol_surface, (symbol_x, symbol_y))
+            
+    def draw_shop_closed(self, screen: pygame.Surface):
+        """Draw shop closed message"""
+        pygame.draw.rect(screen, (40, 40, 50), self.shop_area)
+        pygame.draw.rect(screen, (100, 100, 120), self.shop_area, 2)
+        
+        closed_text = "🔒 Shop Closed"
+        next_open = 3 - (self.round_number % 3)
+        if next_open == 3:
+            next_open = 0
+        
+        info_text = f"Opens in {next_open} rounds"
+        
+        closed_surface = self.font.render(closed_text, True, (150, 150, 150))
+        info_surface = self.small_font.render(info_text, True, (120, 120, 120))
+        
+        closed_x = self.shop_area.x + self.shop_area.width // 2 - closed_surface.get_width() // 2
+        info_x = self.shop_area.x + self.shop_area.width // 2 - info_surface.get_width() // 2
+        
+        screen.blit(closed_surface, (closed_x, self.shop_area.y + 60))
+        screen.blit(info_surface, (info_x, self.shop_area.y + 90))
+        
+    def draw_battle_log(self, screen: pygame.Surface):
+        """Draw battle log at bottom of screen"""
+        log_area = pygame.Rect(200, 770, 640, 80)  # Bottom of screen, aligned with board width
+        pygame.draw.rect(screen, (25, 25, 40), log_area)
+        pygame.draw.rect(screen, (80, 80, 100), log_area, 2)
+        
+        log_title = self.small_font.render("📜 Battle Log", True, (255, 215, 100))
+        screen.blit(log_title, (log_area.x + 5, log_area.y + 5))
+        
+        for i, message in enumerate(self.game_log[-3:]):  # Show 3 messages to fit smaller area
+            log_surface = self.small_font.render(message, True, (180, 180, 200))
+            screen.blit(log_surface, (log_area.x + 5, log_area.y + 25 + i * 18))
+            
+    def get_piece_symbol(self, piece_type: PieceType) -> str:
+        """Get symbol for piece type"""
+        symbols = {
+            PieceType.KING: '♔',
+            PieceType.QUEEN: '♕', 
+            PieceType.ROOK: '♖',
+            PieceType.BISHOP: '♗',
+            PieceType.KNIGHT: '♘',
+            PieceType.PAWN: '♙'
+        }
+        return symbols.get(piece_type, '?')
+    
+    def draw_simple_board(self, screen: pygame.Surface):
+        """Draw a simple chess board without background image"""
+        # Draw alternating squares
+        colors = [(240, 217, 181), (181, 136, 99)]  # Light and dark squares
+        
+        for row in range(8):
+            for col in range(8):
+                color = colors[(row + col) % 2]
+                x = self.board.board_offset_x + col * self.board.cell_size
+                y = self.board.board_offset_y + row * self.board.cell_size
+                pygame.draw.rect(screen, color, (x, y, self.board.cell_size, self.board.cell_size))
+        
+        # Draw board border
+        border_rect = pygame.Rect(
+            self.board.board_offset_x - 5,
+            self.board.board_offset_y - 5,
+            8 * self.board.cell_size + 10,
+            8 * self.board.cell_size + 10
+        )
+        pygame.draw.rect(screen, (100, 70, 40), border_rect, 5)
+        
+    def draw_pieces_with_images(self, screen: pygame.Surface):
+        """Draw pieces using loaded images"""
+        for row in range(8):
+            for col in range(8):
+                piece = self.board.grid[row][col]
+                if piece is not None and piece.is_alive():
+                    x = self.board.board_offset_x + col * self.board.cell_size
+                    y = self.board.board_offset_y + row * self.board.cell_size
+                    
+                    # Get the sprite for this piece type
+                    sprite = self.piece_sprites.get(piece.piece_type)
+                    
+                    if sprite:
+                        # Scale sprite to fit cell
+                        piece_size = self.board.cell_size - 10
+                        scaled_sprite = pygame.transform.scale(sprite, (piece_size, piece_size))
+                        
+                        # Apply color tint for different players
+                        if piece.color == Color.BLACK:
+                            # Create a dark tinted version for black pieces
+                            tinted_sprite = scaled_sprite.copy()
+                            dark_overlay = pygame.Surface((piece_size, piece_size))
+                            dark_overlay.set_alpha(100)
+                            dark_overlay.fill((100, 50, 50))  # Dark red tint
+                            tinted_sprite.blit(dark_overlay, (0, 0))
+                            scaled_sprite = tinted_sprite
+                        
+                        # Draw the piece
+                        screen.blit(scaled_sprite, (x + 5, y + 5))
+                        
+                        # Draw piece border to distinguish colors better
+                        border_color = (255, 255, 255) if piece.color == Color.WHITE else (150, 50, 50)
+                        pygame.draw.rect(screen, border_color, (x + 3, y + 3, piece_size + 4, piece_size + 4), 2)
+                        
+                    else:
+                        # Fallback to text rendering if image not available
+                        symbol = self.get_piece_symbol(piece.piece_type)
+                        font = pygame.font.Font(None, 36)
+                        text_color = (255, 255, 255) if piece.color == Color.WHITE else (150, 50, 50)
+                        text = font.render(symbol, True, text_color)
+                        text_rect = text.get_rect(center=(x + self.board.cell_size // 2, y + self.board.cell_size // 2))
+                        screen.blit(text, text_rect)
+                    
+                    # Draw HP bar above piece if damaged
+                    if piece.hp < piece.max_hp:
+                        bar_width = self.board.cell_size - 20
+                        bar_height = 6
+                        bar_x = x + 10
+                        bar_y = y - 10
+                        
+                        # Background bar (red)
+                        pygame.draw.rect(screen, (200, 50, 50), (bar_x, bar_y, bar_width, bar_height))
+                        
+                        # Health bar (green)
+                        health_ratio = piece.hp / piece.max_hp
+                        health_width = int(bar_width * health_ratio)
+                        pygame.draw.rect(screen, (50, 200, 50), (bar_x, bar_y, health_width, bar_height))
+                        
+                        # Bar border
+                        pygame.draw.rect(screen, (255, 255, 255), (bar_x, bar_y, bar_width, bar_height), 1)

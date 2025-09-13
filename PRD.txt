@@ -1,0 +1,165 @@
+Product Requirement Document (PRD)
+
+Project Title: Retro Pixel Chess Battle
+Hackathon Track: Retro – Turn Something New into Something Old
+
+1. Overview
+
+Retro Pixel Chess Battle is a reinterpretation of chess in a retro pixel-art game style. Inspired by games like “WanNeng Xiangqi,” this game transforms traditional chess into a strategy game with health points, attack values, and unit prices. Each chess piece behaves like a unit with RPG-style stats while keeping the familiar chessboard mechanics.
+
+The goal is to deliver a Minimum Viable Product (MVP) in one day, focusing on gameplay, basic art, and retro-style UI.
+
+2. Objectives
+
+Reimagine chess as a turn-based strategy RPG.
+
+Provide a retro, pixel-art aesthetic with simple animations and effects.
+
+Build a playable MVP with core combat mechanics, basic UI, and simple win/loss conditions.
+
+Ensure the design is minimalistic but extendable for future features.
+
+3. Game Rules and Mechanics
+3.1 Core Board
+
+Board Size: Standard 8x8 grid.
+
+Board Layout: Retro pixel chessboard with neutral margins for UI.
+
+Turn System: Alternating turns between White and Black.
+
+3.2 Piece Mechanics
+
+Each chess piece has:
+
+Health (HP) – decreases when attacked.
+
+Attack Power (ATK) – damage dealt when engaging.
+
+Price (Gold Cost) – value of the piece for balancing or buying in potential extensions.
+
+Example Stats (MVP values):
+
+Pawn: HP 3, ATK 1, Cost 1
+
+Knight: HP 6, ATK 3, Cost 3
+
+Bishop: HP 5, ATK 2, Cost 3
+
+Rook: HP 8, ATK 4, Cost 5
+
+Queen: HP 10, ATK 5, Cost 9
+
+King: HP 12, ATK 2, Cost ∞ (cannot be bought/lost = game ends)
+
+3.3 Combat Rules
+
+Pieces move like in classic chess.
+
+When a piece moves into an enemy’s square, combat occurs:
+
+Attacker deals ATK damage to defender’s HP.
+
+If defender’s HP ≤ 0 → defender is removed.
+
+If defender survives → counterattack occurs (defender deals damage to attacker).
+
+Surviving pieces remain on the board.
+
+3.4 Win/Loss Condition
+
+A player loses if their King is eliminated (HP = 0).
+
+Alternative win condition (optional for MVP): eliminate all opponent’s pieces.
+
+4. MVP Scope
+4.1 Core Features
+
+Pixel-art 8x8 chessboard.
+
+Basic chess piece sprites (retro pixel art, distinct designs).
+
+Implementation of movement + combat rules.
+
+Health and attack system.
+
+Simple UI:
+
+Title area (Game name, Player turn).
+
+Sidebars for stats (piece HP, ATK, cost).
+
+Bottom bar for game logs (e.g., “Pawn attacked Knight for 1 damage”).
+
+4.2 Stretch Features (if time allows)
+
+Gold system + shop to “buy back” pieces.
+
+Small retro animations (hit effects, flashing damage).
+
+Sound effects (retro chip-tune style).
+
+5. Technical Requirements
+5.1 Frontend
+
+Recommendation: Use pygame for simplicity (fits retro style and fast iteration).
+
+Assets: Pixel-art sprites for chessboard and pieces.
+
+UI Layout:
+
+Board in the center.
+
+Top = title + turn info.
+
+Left sidebar = White player info.
+
+Right sidebar = Black player info.
+
+Bottom = game log.
+
+5.2 Backend / Logic
+
+Python class structure:
+
+Board – manages grid, positions, and rendering.
+
+Piece – base class with attributes HP, ATK, Cost, Position.
+
+Game – manages turns, moves, and win conditions.
+
+6. Art Requirements
+
+Style: Retro 16-bit pixel art.
+
+Pieces: Each chess piece has a unique sprite (Pawn, Knight, Bishop, Rook, Queen, King).
+
+Board: Wooden or stone pixel frame, simple clean texture.
+
+Background: Neutral pixelated floor with margins for UI.
+
+7. Deliverables for Hackathon MVP
+
+A playable prototype where:
+
+Players alternate turns.
+
+Pieces move like chess.
+
+Pieces have HP/ATK stats and fight upon collision.
+
+Game ends when one King is defeated.
+
+Retro-style pixel chessboard + placeholder sprites.
+
+Basic UI with turn indicator and log.
+
+8. Success Criteria
+
+Core combat and chess mechanics work.
+
+Visuals align with retro 16-bit pixel style.
+
+Game is playable and understandable within minutes.
+
+MVP ready within 24 hours, extendable later.
