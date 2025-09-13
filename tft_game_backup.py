@@ -67,9 +67,9 @@ class TFTGame:
         piece_files = {
             PieceType.PAWN: "pawn.png",
             PieceType.KNIGHT: "knight.png", 
-            PieceType.BISHOP: "king1.png",  # Using king1 as bishop
-            PieceType.ROOK: "king2.png",    # Using king2 as rook
-            PieceType.QUEEN: "queen.png",
+            PieceType.BISHOP: "bishop.png",
+            PieceType.ROOK: "rook.png",
+            PieceType.QUEEN: "queen4.png",
             PieceType.KING: "king.png"
         }
         

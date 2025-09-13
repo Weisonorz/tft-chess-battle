@@ -87,9 +87,9 @@ class TFTGame:
         piece_files = {
             PieceType.PAWN: "pawn.png",
             PieceType.KNIGHT: "knight.png", 
-            PieceType.BISHOP: "king1.png",  # Using king1 as bishop
-            PieceType.ROOK: "king2.png",    # Using king2 as rook
-            PieceType.QUEEN: "queen.png",
+            PieceType.BISHOP: "bishop.png",
+            PieceType.ROOK: "rook.png",
+            PieceType.QUEEN: "queen4.png",
             PieceType.KING: "king.png"
         }
         
@@ -1051,7 +1051,7 @@ class TFTGame:
             anim_defender = self.combat_anim["defender"]
 
         # Determine jump frame for selected piece
-        selected_jump_frame = ((time_ms // 80) % 3)  # 3-frame cycle, 80ms per frame
+        selected_jump_frame = ((time_ms // 160) % 3)  # 3-frame cycle, 160ms per frame (slower float)
 
         for row in range(8):
             for col in range(8):
@@ -1130,35 +1130,36 @@ class TFTGame:
 
         # Animation: attacker moves toward defender, defender shakes
         progress = min(elapsed / duration, 1.0)
-        # Modular: different piece types can have different effects
+        # Ease-in/ease-out for smoother attack motion
+        ease = 0.5 - 0.5 * math.cos(math.pi * progress)
         if attacker.piece_type == PieceType.KNIGHT:
             # Knight: jump attack
             jump = int(-18 * math.sin(math.pi * progress))
-            ax_anim = ax + int((dx - ax) * progress * 0.7)
-            ay_anim = ay + int((dy - ay) * progress * 0.7) + jump
+            ax_anim = ax + int((dx - ax) * ease * 0.7)
+            ay_anim = ay + int((dy - ay) * ease * 0.7) + jump
         elif attacker.piece_type == PieceType.ROOK:
             # Rook: slide attack
-            ax_anim = ax + int((dx - ax) * progress * 0.8)
-            ay_anim = ay + int((dy - ay) * progress * 0.8)
+            ax_anim = ax + int((dx - ax) * ease * 0.8)
+            ay_anim = ay + int((dy - ay) * ease * 0.8)
         elif attacker.piece_type == PieceType.BISHOP:
             # Bishop: diagonal slide
-            ax_anim = ax + int((dx - ax) * progress * 0.8)
-            ay_anim = ay + int((dy - ay) * progress * 0.8)
+            ax_anim = ax + int((dx - ax) * ease * 0.8)
+            ay_anim = ay + int((dy - ay) * ease * 0.8)
         elif attacker.piece_type == PieceType.QUEEN:
             # Queen: fast dash
-            ax_anim = ax + int((dx - ax) * progress)
-            ay_anim = ay + int((dy - ay) * progress)
+            ax_anim = ax + int((dx - ax) * ease)
+            ay_anim = ay + int((dy - ay) * ease)
         elif attacker.piece_type == PieceType.KING:
             # King: slow, powerful move
-            ax_anim = ax + int((dx - ax) * progress * 0.5)
-            ay_anim = ay + int((dy - ay) * progress * 0.5)
+            ax_anim = ax + int((dx - ax) * ease * 0.5)
+            ay_anim = ay + int((dy - ay) * ease * 0.5)
         else:
             # Pawn: simple step
-            ax_anim = ax + int((dx - ax) * progress * 0.6)
-            ay_anim = ay + int((dy - ay) * progress * 0.6)
+            ax_anim = ax + int((dx - ax) * ease * 0.6)
+            ay_anim = ay + int((dy - ay) * ease * 0.6)
 
-        # Defender shake effect
-        shake = int(6 * math.sin(progress * 8 * math.pi)) if progress > 0.7 else 0
+        # Defender shake effect (stronger, more dynamic)
+        shake = int(10 * math.sin(progress * 12 * math.pi) * (1 - abs(0.5 - progress) * 2)) if progress > 0.6 else 0
 
         # Draw attacker
         sprite_a = self.piece_sprites.get(attacker.piece_type)
