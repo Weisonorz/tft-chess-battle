@@ -13,15 +13,16 @@ def main():
     parser.add_argument("--width", type=int, default=1600, help="Screen width")
     parser.add_argument("--height", type=int, default=1000, help="Screen height")
     args, _ = parser.parse_known_args()
-    SCREEN_WIDTH = args.width
-    SCREEN_HEIGHT = args.height
-    screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.RESIZABLE)
+    # Default to fullscreen
+    screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
     pygame.display.set_caption("🏰 TFT Chess Battle ⚔️")
-    
+    SCREEN_WIDTH = pygame.display.Info().current_w
+    SCREEN_HEIGHT = pygame.display.Info().current_h
+
     # Set up the clock for frame rate
     clock = pygame.time.Clock()
     FPS = 60
-    
+
     # Create TFT game instance
     game = TFTGame(screen_width=SCREEN_WIDTH, screen_height=SCREEN_HEIGHT)
     
@@ -33,6 +34,7 @@ def main():
     running = True
     while running:
         for event in pygame.event.get():
+            print(game.actions_taken)
             if event.type == pygame.QUIT:
                 running = False
             elif event.type == pygame.VIDEORESIZE:
@@ -42,6 +44,9 @@ def main():
 
             # --- Mouse handling ---
             elif event.type == pygame.MOUSEBUTTONDOWN:
+                if game.end:
+                    game = TFTGame()
+                    game.add_to_log("Game reset! TFT Chess Battle restarted!")
                 if event.button == 1:  # Left click
                     mouse_x, mouse_y = event.pos
                     # First try drag from reserve
@@ -68,6 +73,9 @@ def main():
 
             # --- Keyboard handling ---
             elif event.type == pygame.KEYDOWN:
+                if game.end:
+                    game = TFTGame()
+                    game.add_to_log("Game reset! TFT Chess Battle restarted!")
                 if event.key == pygame.K_SPACE and game.selected_piece and game.phase == GamePhase.BATTLE:
                     game.toggle_action_mode()
                 elif event.key == pygame.K_b and game.phase in [GamePhase.SETUP, GamePhase.SHOP]:
@@ -92,6 +100,7 @@ def main():
         # Overlay CRT scanline effect
         try:
             crt_overlay = pygame.image.load("Hackathon_image/crt_scanlines.png").convert_alpha()
+            crt_overlay = pygame.transform.scale(crt_overlay, (SCREEN_WIDTH, SCREEN_HEIGHT))
             screen.blit(crt_overlay, (0, 0))
         except Exception:
             pass

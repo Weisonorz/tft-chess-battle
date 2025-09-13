@@ -192,6 +192,6 @@ Contributions are welcome! Please feel free to submit a Pull Request. For major 
 
 ---
 
-Made with ❤️ for HackCMU 2024
+Made with ❤️ for HackCMU 2025
 
 **Play, Strategize, Conquer!** 🏆
