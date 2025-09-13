@@ -151,18 +151,18 @@ class TFTGame:
         
         # Setup initial pieces: 4 pawns + 1 king per side
         # White pieces (bottom)
-        self.board.grid[7][2] = King(Color.WHITE, 7, 2)
-        self.board.grid[6][1] = Pawn(Color.WHITE, 6, 1)
+        self.board.grid[7][4] = King(Color.WHITE, 7, 4)
         self.board.grid[6][2] = Pawn(Color.WHITE, 6, 2)
         self.board.grid[6][3] = Pawn(Color.WHITE, 6, 3)
         self.board.grid[6][4] = Pawn(Color.WHITE, 6, 4)
+        self.board.grid[6][5] = Pawn(Color.WHITE, 6, 5)
         
         # Black pieces (top)
-        self.board.grid[0][5] = King(Color.BLACK, 0, 5)
+        self.board.grid[0][4] = King(Color.BLACK, 0, 4)
+        self.board.grid[1][2] = Pawn(Color.BLACK, 1, 2)
+        self.board.grid[1][3] = Pawn(Color.BLACK, 1, 3)
         self.board.grid[1][4] = Pawn(Color.BLACK, 1, 4)
         self.board.grid[1][5] = Pawn(Color.BLACK, 1, 5)
-        self.board.grid[1][6] = Pawn(Color.BLACK, 1, 6)
-        self.board.grid[1][7] = Pawn(Color.BLACK, 1, 7)
         
     def generate_shop(self):
         """Generate 5 random items for each shop: pieces, cards, consumables"""
@@ -202,14 +202,14 @@ class TFTGame:
                 self.black_shop_items.append(black_new_piece)
             elif roll < 0.8:
                 # Card (30%)
-                arrow_card = Card(CardType.ARROW_VOLLEY, True, "Hackathon_image/arrow_volley.png", "Arrow Volley", 3)
-                disarm_card = Card(CardType.DISARM, False, "Hackathon_image/disarm.png", "Disarm", 3)
-                redemption_card = Card(CardType.REDEMPTION, True, "Hackathon_image/redemption.png", "Redemption", 3)
-                lightning_card = Card(CardType.LIGHTNING, True, "Hackathon_image/lightning.png", "Lightning", 3)
-                tower_card = Card(CardType.TOWER, True, "Hackathon_image/tower_defense.png", "Tower Defense", 3)
+                arrow_card = Card(CardType.ARROW_VOLLEY, True, "Hackathon_image/arrow_volley.png", "Arrow Volley", 5)
+                #disarm_card = Card(CardType.DISARM, False, "Hackathon_image/disarm.png", "Disarm", 3)
+                redemption_card = Card(CardType.REDEMPTION, True, "Hackathon_image/redemption.png", "Redemption", 5)
+                lightning_card = Card(CardType.LIGHTNING, True, "Hackathon_image/lightning.png", "Lightning", 5)
+                tower_card = Card(CardType.TOWER, True, "Hackathon_image/tower_defense.png", "Tower Defense", 8)
                 # Randomly pick one card
-                wc = random.choice([arrow_card, disarm_card, redemption_card, lightning_card, tower_card])
-                bc = random.choice([arrow_card, disarm_card, redemption_card, lightning_card, tower_card])
+                wc = random.choice([arrow_card, redemption_card, lightning_card, tower_card])
+                bc = random.choice([arrow_card, redemption_card, lightning_card, tower_card])
                 self.white_shop_items.append(wc)
                 self.black_shop_items.append(bc)
             else:
@@ -584,6 +584,9 @@ class TFTGame:
             self.add_to_log("Black can only deploy in rows 1-2 (top 2 rows)")
             return False
             
+        if not (0 <= col <= 7):
+            return False
+
         # Check if position is empty
         if self.board.get_piece_at(row, col) is not None:
             return False

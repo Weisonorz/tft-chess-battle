@@ -76,7 +76,9 @@ def main():
             # --- Keyboard handling ---
             elif event.type == pygame.KEYDOWN:
                 if game.end:
-                    game = TFTGame()
+                    SCREEN_WIDTH = pygame.display.Info().current_w
+                    SCREEN_HEIGHT = pygame.display.Info().current_h
+                    game = TFTGame(screen_width=SCREEN_WIDTH, screen_height = SCREEN_HEIGHT)
                     game.add_to_log("Game reset! TFT Chess Battle restarted!")
                 if event.key == pygame.K_SPACE and game.selected_piece and game.phase == GamePhase.BATTLE:
                     game.toggle_action_mode()
