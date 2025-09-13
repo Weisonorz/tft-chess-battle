@@ -1,11 +1,13 @@
 from enum import Enum
 import random
+from piece import *
 
 class CardType(Enum):
     ARROW_VOLLEY = "arrow_volley"
     DISARM = "disarm"
     REDEMPTION = "redemption"
     LIGHTNING = 'lightning'
+    TOWER = 'Tower Defense'
     # Add more card types here as needed
 
 class Card:
@@ -18,13 +20,15 @@ class Card:
 
     def get_effect_description(self):
         if self.card_type == CardType.ARROW_VOLLEY:
-            return "Arrow Volley: -1 HP all units"
+            return "Arrow Volley: -1 HP all opponent units"
         elif self.card_type == CardType.DISARM:
             return "Disarm: Set attack=0"
         elif self.card_type == CardType.REDEMPTION:
             return "Redemption: all units on black tiles take 1 damage; all units on white tiles gain 1 health"
         elif self.card_type == CardType.LIGHTNING:
             return "Lightning: 3 dmg to five random tiles on the board"
+        elif self.card_type == CardType.Tower:
+            return "Gain 2 rooks that cannot move."
         else:
             return "Unknown effect"
     
@@ -69,5 +73,12 @@ class Card:
                 if piece and piece.is_alive():
                     piece.hp = max(0, piece.hp-3)
             game.add_to_log(f"{player.value.title()} used Lightning! Five random tiles take 3 dmg.")
-
+        elif self.card_type == CardType.TOWER:
+            if player == Color.WHITE:
+                game.white_reserve.append(Tower(player, 0, 0))
+                game.white_reserve.append(Tower(player, 0, 0))
+            elif player == Color.BLACK:
+                game.black_reserve.append(Tower(player, 0, 0))
+                game.black_reserve.append(Tower(player, 0, 0))
+            game.add_to_log(f"{player.value.title()} used Tower Defense! Gain 2 rooks that cannot move.")
         self.cleanup(game, player)
