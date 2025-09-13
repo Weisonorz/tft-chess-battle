@@ -6,10 +6,15 @@ def main():
     # Initialize Pygame
     pygame.init()
     
-    # Set up the display - larger window with better spacing
-    SCREEN_WIDTH = 1600
-    SCREEN_HEIGHT = 1000
-    screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
+    # Allow custom screen size via command line or default
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--width", type=int, default=1600, help="Screen width")
+    parser.add_argument("--height", type=int, default=1000, help="Screen height")
+    args, _ = parser.parse_known_args()
+    SCREEN_WIDTH = args.width
+    SCREEN_HEIGHT = args.height
+    screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.RESIZABLE)
     pygame.display.set_caption("🏰 TFT Chess Battle ⚔️")
     
     # Set up the clock for frame rate
@@ -17,7 +22,7 @@ def main():
     FPS = 60
     
     # Create TFT game instance
-    game = TFTGame()
+    game = TFTGame(screen_width=SCREEN_WIDTH, screen_height=SCREEN_HEIGHT)
     
     # Add initial message to log
     game.add_to_log("TFT Chess Battle started! Buy pieces and prepare for war!")
@@ -29,6 +34,10 @@ def main():
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
+            elif event.type == pygame.VIDEORESIZE:
+                SCREEN_WIDTH, SCREEN_HEIGHT = event.w, event.h
+                screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.RESIZABLE)
+                game = TFTGame(screen_width=SCREEN_WIDTH, screen_height=SCREEN_HEIGHT)
 
             # --- Mouse handling ---
             elif event.type == pygame.MOUSEBUTTONDOWN:

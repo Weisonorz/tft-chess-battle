@@ -13,8 +13,15 @@ class GamePhase(Enum):
     END_ROUND = "end_round"
 
 class TFTGame:
-    def __init__(self):
-        self.board = Board()
+    def __init__(self, screen_width=1600, screen_height=1000):
+        self.screen_width = screen_width
+        self.screen_height = screen_height
+        # Center board and UI based on screen size
+        board_size = min(screen_width, screen_height) * 0.7
+        cell_size = int(board_size // 8)
+        board_offset_x = (screen_width - cell_size * 8) // 2
+        board_offset_y = max(80, (screen_height - cell_size * 8) // 2)
+        self.board = Board(cell_size=cell_size, board_offset_x=board_offset_x, board_offset_y=board_offset_y)
         self.current_player = Color.WHITE
         self.selected_piece = None
         self.selected_row = -1
@@ -53,12 +60,17 @@ class TFTGame:
         self.setup_initial_board()
         self.generate_shop()
         
-        # UI layout - adjusted to prevent overlap
-        # Board is at (250, 150) with size 720x720 (8*90)
-        self.white_reserve_area = pygame.Rect(30, 150, 180, 600)    # Left side
-        self.black_reserve_area = pygame.Rect(1300, 150, 180, 350)  # Far right, top
-        self.shop_area = pygame.Rect(1300, 520, 180, 400)           # Far right, below black reserve
-        self.economy_panel_rect = pygame.Rect(1050, 40, 400, 180)   # Top right, above shop and black reserve
+        # UI layout - adjusted to prevent overlap and screen size
+        reserve_width = int(screen_width * 0.12)
+        reserve_height = int(screen_height * 0.6)
+        shop_width = int(screen_width * 0.12)
+        shop_height = int(screen_height * 0.4)
+        panel_width = int(screen_width * 0.25)
+        panel_height = int(screen_height * 0.18)
+        self.white_reserve_area = pygame.Rect(20, board_offset_y, reserve_width, reserve_height)
+        self.black_reserve_area = pygame.Rect(screen_width - reserve_width - 20, board_offset_y, reserve_width, reserve_height // 2)
+        self.shop_area = pygame.Rect(screen_width - shop_width - 20, board_offset_y + reserve_height // 2 + 20, shop_width, shop_height)
+        self.economy_panel_rect = pygame.Rect(screen_width - panel_width - 40, 40, panel_width, panel_height)
         
     def load_assets(self):
         pygame.font.init()
@@ -726,11 +738,11 @@ class TFTGame:
         
     def draw_economy_panel(self, screen: pygame.Surface):
         """Draw detailed economic system information"""
-        # Economy panel positioning - moved to fit new layout
-        panel_x = 1000
+        # Economy panel positioning - dynamic
+        panel_width = int(self.screen_width * 0.25)
+        panel_height = int(self.screen_height * 0.13)
+        panel_x = self.screen_width - panel_width - 40
         panel_y = 20
-        panel_width = 600
-        panel_height = 120
         
         # Draw economy panel background
         economy_rect = pygame.Rect(panel_x, panel_y, panel_width, panel_height)
@@ -960,7 +972,11 @@ class TFTGame:
         
     def draw_battle_log(self, screen: pygame.Surface):
         """Draw battle log in retro terminal style with typewriter effect and color coding"""
-        log_area = pygame.Rect(250, 880, 720, 100)
+        log_width = int(self.screen_width * 0.45)
+        log_height = 100
+        log_x = (self.screen_width - log_width) // 2
+        log_y = self.screen_height - log_height - 20
+        log_area = pygame.Rect(log_x, log_y, log_width, log_height)
         pygame.draw.rect(screen, self.palette["black"], log_area)
         pygame.draw.rect(screen, self.palette["neon_green"], log_area, 3)
         pixel_size = 8

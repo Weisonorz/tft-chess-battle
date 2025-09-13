@@ -3,12 +3,12 @@ from typing import Optional, List, Tuple
 from piece import Piece, PieceType, Color
 
 class Board:
-    def __init__(self):
+    def __init__(self, cell_size=90, board_offset_x=250, board_offset_y=150):
         self.grid = [[None for _ in range(8)] for _ in range(8)]
         self.board_sprite = None
-        self.cell_size = 90  # Larger board cells
-        self.board_offset_x = 250  # More space from left
-        self.board_offset_y = 150  # More space from top
+        self.cell_size = cell_size
+        self.board_offset_x = board_offset_x
+        self.board_offset_y = board_offset_y
         self.border_width = 20
         self.setup_initial_pieces()
         
