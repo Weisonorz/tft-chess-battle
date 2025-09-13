@@ -188,16 +188,8 @@ class TFTGame:
             new_piece = Piece(piece_template.piece_type, Color.BLACK, 0, 0)
             self.black_reserve.append(new_piece)
             
-        # Remove from shop and replace
+        # Remove from shop (do not replace, shop updates every three rounds)
         self.shop_items.pop(shop_index)
-        
-        # Add new item to shop
-        piece_types = [PieceType.PAWN, PieceType.KNIGHT, PieceType.BISHOP, 
-                      PieceType.ROOK, PieceType.QUEEN]
-        weights = [40, 25, 20, 10, 5]
-        new_type = random.choices(piece_types, weights=weights)[0]
-        new_shop_piece = Piece(new_type, Color.WHITE, 0, 0)
-        self.shop_items.insert(shop_index, new_shop_piece)
         
         self.add_to_log(f"{player.value.title()} bought {piece_template.piece_type.value.title()} for {cost} coins")
         return True
