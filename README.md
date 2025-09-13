@@ -29,7 +29,7 @@ Transform traditional chess into an exciting strategy game where pieces have **H
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/yourusername/tft-chess-battle.git
+   git clone https://github.com/Weisonorz/tft-chess-battle.git
    cd tft-chess-battle
    ```
 
