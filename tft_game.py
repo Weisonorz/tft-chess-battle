@@ -451,11 +451,11 @@ class TFTGame:
             return False
             
         # Check deployment zones
-        if player == Color.WHITE and not (5 <= row <= 7):
-            self.add_to_log("White can only deploy in rows 6-8 (bottom 3 rows)")
+        if player == Color.WHITE and not (6 <= row <= 7):
+            self.add_to_log("White can only deploy in rows 7-8 (bottom 2 rows)")
             return False
-        elif player == Color.BLACK and not (0 <= row <= 2):
-            self.add_to_log("Black can only deploy in rows 1-3 (top 3 rows)")
+        elif player == Color.BLACK and not (0 <= row <= 1):
+            self.add_to_log("Black can only deploy in rows 1-2 (top 2 rows)")
             return False
             
         # Check if position is empty
@@ -850,7 +850,7 @@ class TFTGame:
         
         # Economic info
         eco_y = panel_y + 75
-        income_text = f"Round Income: +1 🪙 | Kill Reward: +½ cost | Win Bonus: +3 🪙"
+        income_text = f"Round Income: +1 🪙 | Kill Reward: +½ cost"
         income_surface = self.small_font.render(income_text, True, (150, 200, 150))
         screen.blit(income_surface, (panel_x + 10, eco_y))
         
