@@ -1,6 +1,6 @@
 import pygame
 from typing import Optional, List, Tuple
-from piece import Piece, PieceType, Color
+from piece import *
 
 class Board:
     def __init__(self, cell_size=90, board_offset_x=250, board_offset_y=150):
@@ -14,32 +14,32 @@ class Board:
         
     def setup_initial_pieces(self):
         # Setup white pieces - Mix of different piece types for testing
-        self.grid[7][4] = Piece(PieceType.KING, Color.WHITE, 7, 4)      # King in center
-        self.grid[7][0] = Piece(PieceType.ROOK, Color.WHITE, 7, 0)      # Rook on left
-        self.grid[7][7] = Piece(PieceType.ROOK, Color.WHITE, 7, 7)      # Rook on right
-        self.grid[7][1] = Piece(PieceType.KNIGHT, Color.WHITE, 7, 1)    # Knight
-        self.grid[7][6] = Piece(PieceType.KNIGHT, Color.WHITE, 7, 6)    # Knight
-        self.grid[7][2] = Piece(PieceType.BISHOP, Color.WHITE, 7, 2)    # Bishop
-        self.grid[7][5] = Piece(PieceType.BISHOP, Color.WHITE, 7, 5)    # Bishop
-        self.grid[7][3] = Piece(PieceType.QUEEN, Color.WHITE, 7, 3)     # Queen
+        self.grid[7][4] = King(Color.WHITE, 7, 4)      # King in center
+        self.grid[7][0] = Rook(Color.WHITE, 7, 0)      # Rook on left
+        self.grid[7][7] = Rook(Color.WHITE, 7, 7)      # Rook on right
+        self.grid[7][1] = Knight(Color.WHITE, 7, 1)    # Knight
+        self.grid[7][6] = Knight(Color.WHITE, 7, 6)    # Knight
+        self.grid[7][2] = Bishop(Color.WHITE, 7, 2)    # Bishop
+        self.grid[7][5] = Bishop(Color.WHITE, 7, 5)    # Bishop
+        self.grid[7][3] = Queen(Color.WHITE, 7, 3)     # Queen
         
         # White pawns
         for col in range(8):
-            self.grid[6][col] = Piece(PieceType.PAWN, Color.WHITE, 6, col)
+            self.grid[6][col] = Pawn(Color.WHITE, 6, col)
             
         # Setup black pieces - Mirror of white
-        self.grid[0][4] = Piece(PieceType.KING, Color.BLACK, 0, 4)      # King in center
-        self.grid[0][0] = Piece(PieceType.ROOK, Color.BLACK, 0, 0)      # Rook on left
-        self.grid[0][7] = Piece(PieceType.ROOK, Color.BLACK, 0, 7)      # Rook on right
-        self.grid[0][1] = Piece(PieceType.KNIGHT, Color.BLACK, 0, 1)    # Knight
-        self.grid[0][6] = Piece(PieceType.KNIGHT, Color.BLACK, 0, 6)    # Knight
-        self.grid[0][2] = Piece(PieceType.BISHOP, Color.BLACK, 0, 2)    # Bishop
-        self.grid[0][5] = Piece(PieceType.BISHOP, Color.BLACK, 0, 5)    # Bishop
-        self.grid[0][3] = Piece(PieceType.QUEEN, Color.BLACK, 0, 3)     # Queen
+        self.grid[0][4] = King(Color.BLACK, 0, 4)      # King in center
+        self.grid[0][0] = Rook(Color.BLACK, 0, 0)      # Rook on left
+        self.grid[0][7] = Rook(Color.BLACK, 0, 7)      # Rook on right
+        self.grid[0][1] = Knight(Color.BLACK, 0, 1)    # Knight
+        self.grid[0][6] = Knight(Color.BLACK, 0, 6)    # Knight
+        self.grid[0][2] = Bishop(Color.BLACK, 0, 2)    # Bishop
+        self.grid[0][5] = Bishop(Color.BLACK, 0, 5)    # Bishop
+        self.grid[0][3] = Queen(Color.BLACK, 0, 3)     # Queen
         
         # Black pawns
         for col in range(8):
-            self.grid[1][col] = Piece(PieceType.PAWN, Color.BLACK, 1, col)
+            self.grid[1][col] = Pawn(Color.BLACK, 1, col)
     
     def load_board_sprite(self, sprite_path: str):
         self.board_sprite = pygame.image.load(sprite_path)

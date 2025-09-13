@@ -1,7 +1,7 @@
 import pygame
 from typing import Optional, List, Tuple, Dict
 from board import Board
-from piece import Piece, Color, PieceType
+from piece import *
 from game import GameState
 import random
 from enum import Enum
@@ -147,18 +147,18 @@ class TFTGame:
         
         # Setup initial pieces: 4 pawns + 1 king per side
         # White pieces (bottom)
-        self.board.grid[7][2] = Piece(PieceType.KING, Color.WHITE, 7, 2)
-        self.board.grid[6][1] = Piece(PieceType.PAWN, Color.WHITE, 6, 1)
-        self.board.grid[6][2] = Piece(PieceType.PAWN, Color.WHITE, 6, 2)
-        self.board.grid[6][3] = Piece(PieceType.PAWN, Color.WHITE, 6, 3)
-        self.board.grid[6][4] = Piece(PieceType.PAWN, Color.WHITE, 6, 4)
+        self.board.grid[7][2] = King(Color.WHITE, 7, 2)
+        self.board.grid[6][1] = Pawn(Color.WHITE, 6, 1)
+        self.board.grid[6][2] = Pawn(Color.WHITE, 6, 2)
+        self.board.grid[6][3] = Pawn(Color.WHITE, 6, 3)
+        self.board.grid[6][4] = Pawn(Color.WHITE, 6, 4)
         
         # Black pieces (top)
-        self.board.grid[0][5] = Piece(PieceType.KING, Color.BLACK, 0, 5)
-        self.board.grid[1][4] = Piece(PieceType.PAWN, Color.BLACK, 1, 4)
-        self.board.grid[1][5] = Piece(PieceType.PAWN, Color.BLACK, 1, 5)
-        self.board.grid[1][6] = Piece(PieceType.PAWN, Color.BLACK, 1, 6)
-        self.board.grid[1][7] = Piece(PieceType.PAWN, Color.BLACK, 1, 7)
+        self.board.grid[0][5] = King(Color.BLACK, 0, 5)
+        self.board.grid[1][4] = Pawn(Color.BLACK, 1, 4)
+        self.board.grid[1][5] = Pawn(Color.BLACK, 1, 5)
+        self.board.grid[1][6] = Pawn(Color.BLACK, 1, 6)
+        self.board.grid[1][7] = Pawn(Color.BLACK, 1, 7)
         
     def generate_shop(self):
         """Generate 5 random items for each shop: pieces, cards, consumables"""
@@ -173,9 +173,29 @@ class TFTGame:
             if roll < 0.5:
                 # Piece (50%)
                 wt = random.choices(piece_types, weights=weights)[0]
+                if wt == PieceType.PAWN:
+                    white_new_piece = Pawn(Color.WHITE, 0, 0)
+                if wt == PieceType.KNIGHT:
+                    white_new_piece = Knight(Color.WHITE, 0, 0)
+                if wt == PieceType.BISHOP:
+                    white_new_piece = Bishop(Color.WHITE, 0, 0)
+                if wt == PieceType.ROOK:
+                    white_new_piece = Rook(Color.WHITE, 0, 0)
+                if wt == PieceType.QUEEN:
+                    white_new_piece = Queen(Color.WHITE, 0, 0)
                 bt = random.choices(piece_types, weights=weights)[0]
-                self.white_shop_items.append(Piece(wt, Color.WHITE, 0, 0))
-                self.black_shop_items.append(Piece(bt, Color.BLACK, 0, 0))
+                if bt == PieceType.PAWN:
+                    black_new_piece = Pawn(Color.BLACK, 0, 0)
+                if bt == PieceType.KNIGHT:
+                    black_new_piece = Knight(Color.BLACK, 0, 0)
+                if bt == PieceType.BISHOP:
+                    black_new_piece = Bishop(Color.BLACK, 0, 0)
+                if bt == PieceType.ROOK:
+                    black_new_piece = Rook(Color.BLACK, 0, 0)
+                if bt == PieceType.QUEEN:
+                    black_new_piece = Queen(Color.BLACK, 0, 0)
+                self.white_shop_items.append(white_new_piece)
+                self.black_shop_items.append(black_new_piece)
             elif roll < 0.8:
                 # Card (30%)
                 arrow_card = Card(CardType.ARROW_VOLLEY, True, "Hackathon_image/arrow_volley.png", "Arrow Volley", 3)
@@ -244,16 +264,26 @@ class TFTGame:
             shop_list.pop(shop_index)
             return True
         # Handle Piece purchase
+        if item.piece_type == PieceType.PAWN:
+            new_piece = Pawn(Color.WHITE, 0, 0)
+        if item.piece_type == PieceType.KNIGHT:
+            new_piece = Knight(Color.WHITE, 0, 0)
+        if item.piece_type == PieceType.BISHOP:
+            new_piece = Bishop(Color.WHITE, 0, 0)
+        if item.piece_type == PieceType.ROOK:
+            new_piece = Rook(Color.WHITE, 0, 0)
+        if item.piece_type == PieceType.QUEEN:
+            new_piece = Queen(Color.WHITE, 0, 0)
+
         cost = self.get_piece_cost(item.piece_type)
         if not self.can_afford(player, item.piece_type):
             return False
         if player == Color.WHITE:
             self.white_coins -= cost
-            new_piece = Piece(item.piece_type, Color.WHITE, 0, 0)
             self.white_reserve.append(new_piece)
         else:
             self.black_coins -= cost
-            new_piece = Piece(item.piece_type, Color.BLACK, 0, 0)
+            new_piece.color = Color.BLACK
             self.black_reserve.append(new_piece)
         shop_list.pop(shop_index)
         self.add_to_log(f"{player.value.title()} bought {item.piece_type.value.title()} for {cost} coins")
