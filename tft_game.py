@@ -130,7 +130,8 @@ class TFTGame:
         card_icon_files = {
             CardType.ARROW_VOLLEY: "arrow_volley.png",
             CardType.DISARM: "disarm.png",
-            CardType.REDEMPTION: "redemption.png"
+            CardType.REDEMPTION: "redemption.png", 
+            CardType.LIGHTNING: "lightniing.png"
         }
         for card_type, filename in card_icon_files.items():
             try:
@@ -203,9 +204,10 @@ class TFTGame:
                 arrow_card = Card(CardType.ARROW_VOLLEY, True, "Hackathon_image/arrow_volley.png", "Arrow Volley", 3)
                 disarm_card = Card(CardType.DISARM, False, "Hackathon_image/disarm.png", "Disarm", 3)
                 redemption_card = Card(CardType.REDEMPTION, True, "Hackathon_image/redemption.png", "Redemption", 3)
+                lightning_card = Card(CardType.LIGHTNING, True, "Hackathon_image/lightning.png", "Lightning", 3)
                 # Randomly pick one card
-                wc = random.choice([arrow_card, disarm_card, redemption_card])
-                bc = random.choice([arrow_card, disarm_card, redemption_card])
+                wc = random.choice([arrow_card, disarm_card, redemption_card, lightning_card])
+                bc = random.choice([arrow_card, disarm_card, redemption_card, lightning_card])
                 self.white_shop_items.append(wc)
                 self.black_shop_items.append(bc)
             else:
@@ -254,11 +256,7 @@ class TFTGame:
                 self.black_coins -= cost
             # Immediate effect
             if item.immediate:
-                if item.card_type == CardType.ARROW_VOLLEY:
-                # Arrow Volley: use card's effect logic
-                    item.apply_effect(self, player)
-                elif item.card_type == CardType.REDEMPTION:
-                    item.apply_effect(self, player)
+                item.apply_effect(self, player)
             elif not item.immediate and item.card_type == CardType.DISARM:
                 # Disarm: add to inventory
                 if player == Color.WHITE:
@@ -890,7 +888,8 @@ class TFTGame:
                 card_type = "Immediate" if item.immediate else "Stored"
                 effectDict = {CardType.ARROW_VOLLEY: "Arrow Volley: -1 HP all units", 
                               CardType.DISARM: "Disarm: Set attack=0", 
-                              CardType.REDEMPTION: "Redemption: black tiles take 1 dmg; white tiles gain 1 health"}
+                              CardType.REDEMPTION: "Redemption: black tiles take 1 dmg; white tiles gain 1 health", 
+                              CardType.LIGHTNING: "Lightning: 3 dmg to five random tiles on board"}
                 effect = effectDict[item.card_type]
                 lines = [title, cost, f"Type: {card_type}", effect, "Shop Card"]
             else:
