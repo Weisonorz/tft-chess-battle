@@ -129,7 +129,8 @@ class TFTGame:
         # Load card icons (use placeholder if missing)
         card_icon_files = {
             CardType.ARROW_VOLLEY: "arrow_volley.png",
-            CardType.DISARM: "disarm.png"
+            CardType.DISARM: "disarm.png",
+            CardType.REDEMPTION: "redemption.png"
         }
         for card_type, filename in card_icon_files.items():
             try:
@@ -181,9 +182,10 @@ class TFTGame:
                 # Card (30%)
                 arrow_card = Card(CardType.ARROW_VOLLEY, True, "Hackathon_image/arrow_volley.png", "Arrow Volley", 3)
                 disarm_card = Card(CardType.DISARM, False, "Hackathon_image/disarm.png", "Disarm", 3)
+                redemption_card = Card(CardType.REDEMPTION, True, "Hackathon_image/redemption.png", "Redemption", 3)
                 # Randomly pick one card
-                wc = random.choice([arrow_card, disarm_card])
-                bc = random.choice([arrow_card, disarm_card])
+                wc = random.choice([arrow_card, disarm_card, redemption_card])
+                bc = random.choice([arrow_card, disarm_card, redemption_card])
                 self.white_shop_items.append(wc)
                 self.black_shop_items.append(bc)
             else:
@@ -231,9 +233,12 @@ class TFTGame:
             else:
                 self.black_coins -= cost
             # Immediate effect
-            if item.immediate and item.card_type == CardType.ARROW_VOLLEY:
+            if item.immediate:
+                if item.card_type == CardType.ARROW_VOLLEY:
                 # Arrow Volley: use card's effect logic
-                item.apply_effect(self, player)
+                    item.apply_effect(self, player)
+                elif item.card_type == CardType.REDEMPTION:
+                    item.apply_effect(self, player)
             elif not item.immediate and item.card_type == CardType.DISARM:
                 # Disarm: add to inventory
                 if player == Color.WHITE:
@@ -316,7 +321,6 @@ class TFTGame:
         self.add_to_log(f"Round {self.round_number} ended! +1 coin to both players")
         if not self.end:
             self.start_next_round()
-
 
     def end_game(self):
         """End the game"""
@@ -622,6 +626,8 @@ class TFTGame:
         
     def make_move(self, from_row: int, from_col: int, to_row: int, to_col: int):
         """Move a piece"""
+        
+
         moving_piece = self.board.get_piece_at(from_row, from_col)
         
         if not moving_piece or not moving_piece.is_alive():
@@ -631,7 +637,7 @@ class TFTGame:
         target_piece = self.board.get_piece_at(to_row, to_col)
         if target_piece is None:  # Only move to empty squares
             self.board.move_piece(from_row, from_col, to_row, to_col)
-        
+            
         self.actions_taken[self.current_player] = True
         if all(self.actions_taken.values()):
             self.end_battle_phase()
@@ -641,6 +647,7 @@ class TFTGame:
     
     def make_attack(self, attacker_row: int, attacker_col: int, target_row: int, target_col: int):
         """Attack an enemy piece"""
+
         attacking_piece = self.board.get_piece_at(attacker_row, attacker_col)
         target_piece = self.board.get_piece_at(target_row, target_col)
         
@@ -662,6 +669,10 @@ class TFTGame:
             "attacker_pos": (attacker_row, attacker_col),
             "defender_pos": (target_row, target_col)
         }
+        self.actions_taken[self.current_player] = True
+        if all(self.actions_taken.values()):
+            self.end_battle_phase()
+
         self.actions_taken[self.current_player] = True
         if all(self.actions_taken.values()):
             self.end_battle_phase()
@@ -851,7 +862,10 @@ class TFTGame:
                 title = item.name
                 cost = f"Cost: {item.cost}"
                 card_type = "Immediate" if item.immediate else "Stored"
-                effect = "Arrow Volley: -1 HP all units" if item.card_type == CardType.ARROW_VOLLEY else "Disarm: Set attack=0"
+                effectDict = {CardType.ARROW_VOLLEY: "Arrow Volley: -1 HP all units", 
+                              CardType.DISARM: "Disarm: Set attack=0", 
+                              CardType.REDEMPTION: "Redemption: black tiles take 1 dmg; white tiles gain 1 health"}
+                effect = effectDict[item.card_type]
                 lines = [title, cost, f"Type: {card_type}", effect, "Shop Card"]
             else:
                 title = f"{item.piece_type.value.title()[:12]}"

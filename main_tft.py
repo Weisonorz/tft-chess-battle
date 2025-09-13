@@ -34,7 +34,6 @@ def main():
     running = True
     while running:
         for event in pygame.event.get():
-            print(game.actions_taken)
             if event.type == pygame.QUIT:
                 running = False
             elif event.type == pygame.VIDEORESIZE:
@@ -82,8 +81,6 @@ def main():
                     game.start_battle_phase()
                 elif event.key == pygame.K_n and game.phase == GamePhase.END_ROUND:
                     game.start_next_round()
-                #elif event.key == pygame.K_e and not game.battle_ended and game.phase == GamePhase.BATTLE:
-                    #game.end_battle_phase()
                 elif event.key == pygame.K_r:  # Reset game
                     game = TFTGame()
                     game.add_to_log("Game reset! TFT Chess Battle restarted!")
