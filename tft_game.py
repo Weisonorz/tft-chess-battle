@@ -43,6 +43,7 @@ class TFTGame:
         self.game_state = GameState.PLAYING
         self.action_mode = "move"
         self.game_log = []
+        self.end = False
         
         # TFT-specific systems
         self.round_number = 1
@@ -325,6 +326,13 @@ class TFTGame:
         self.black_coins += 1
         
         self.add_to_log(f"Round {self.round_number} ended! +1 coin to both players")
+
+
+    def end_game(self):
+        """End the game"""
+        self.add_to_log("Click anywhere to reset the game")
+        self.end = True
+
         
     def start_next_round(self):
         """Start the next round"""
@@ -700,10 +708,12 @@ class TFTGame:
             self.add_to_log("BLACK WINS THE BATTLE! White King defeated!")
             self.black_coins += 3  # Bonus for winning
             self.end_battle_phase()
+            self.end_game()
         elif not black_king_alive:
             self.add_to_log("WHITE WINS THE BATTLE! Black King defeated!")
             self.white_coins += 3  # Bonus for winning
             self.end_battle_phase()
+            self.end_game()
     
     def toggle_action_mode(self):
         """Toggle between move and attack modes"""
