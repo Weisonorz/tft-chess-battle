@@ -127,7 +127,7 @@ class Piece:
         return targets
     
     def _get_knight_moves(self, board) -> List[Tuple[int, int]]:
-        """Knight movement: L-shape (2+1) to empty squares only"""
+        """Knight movement: L-shape (2+1) to empty squares or enemy pieces"""
         moves = []
         knight_moves = [(-2, -1), (-2, 1), (-1, -2), (-1, 2),
                        (1, -2), (1, 2), (2, -1), (2, 1)]
@@ -135,10 +135,10 @@ class Piece:
         for dr, dc in knight_moves:
             new_row = self.row + dr
             new_col = self.col + dc
-            if (0 <= new_row < 8 and 0 <= new_col < 8 and 
-                board[new_row][new_col] is None):  # Only empty squares for movement
-                moves.append((new_row, new_col))
-                
+            if 0 <= new_row < 8 and 0 <= new_col < 8:
+                target_piece = board[new_row][new_col]
+                if target_piece is None or (target_piece.color != self.color and target_piece.is_alive()):
+                    moves.append((new_row, new_col))
         return moves
     
     def _get_knight_attack_targets(self, board) -> List[Tuple[int, int]]:

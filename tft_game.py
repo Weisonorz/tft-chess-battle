@@ -41,6 +41,9 @@ class TFTGame:
         self.dragging_from_reserve = False
         self.drag_offset_x = 0
         self.drag_offset_y = 0
+
+        # Combat animation state
+        self.combat_anim = None  # None or dict with attacker, defender, start_time, type
         
         # UI elements
         self.font = None
@@ -534,18 +537,20 @@ class TFTGame:
         # Check if attack is valid
         if not attacking_piece.can_attack(target_row, target_col, self.board.grid):
             return
-            
-        # Handle combat
-        self.handle_combat(attacking_piece, target_piece)
-        
-        # Remove dead pieces and give rewards
-        if not target_piece.is_alive():
-            self.board.grid[target_row][target_col] = None
-            self.handle_piece_death(target_piece, attacking_piece.color)
-            
-        self.deselect_piece()
-        self.switch_player()
-        self.check_battle_end()
+
+        # Start combat animation
+        self.combat_anim = {
+            "attacker": attacking_piece,
+            "defender": target_piece,
+            "start_time": pygame.time.get_ticks(),
+            "type": f"{attacking_piece.piece_type.value}_vs_{target_piece.piece_type.value}",
+            "attacker_pos": (attacker_row, attacker_col),
+            "defender_pos": (target_row, target_col)
+        }
+
+        # Handle combat after animation (delayed)
+        # The actual damage and removal will be handled after animation in draw()
+
     
     def handle_combat(self, attacker: Piece, defender: Piece):
         """Handle combat between two pieces"""
@@ -615,6 +620,48 @@ class TFTGame:
         
         # Draw pieces with custom rendering using loaded images
         self.draw_pieces_with_images(screen)
+
+        # Combat animation rendering
+        if self.combat_anim:
+            self.draw_combat_animation(screen, self.combat_anim)
+            # Animation duration: 600ms
+            elapsed = pygame.time.get_ticks() - self.combat_anim["start_time"]
+            if elapsed > 600:
+                # After animation, apply combat logic and cleanup
+                attacker = self.combat_anim["attacker"]
+                defender = self.combat_anim["defender"]
+                self.handle_combat(attacker, defender)
+                # Remove dead pieces and give rewards
+                if not defender.is_alive():
+                    row, col = self.combat_anim["defender_pos"]
+                    self.board.grid[row][col] = None
+                    self.handle_piece_death(defender, attacker.color)
+                self.deselect_piece()
+                self.switch_player()
+                self.check_battle_end()
+                self.combat_anim = None
+
+        # Draw dragging piece at mouse position if dragging from reserve
+        if self.dragging_piece and self.dragging_from_reserve:
+            sprite = self.piece_sprites.get(self.dragging_piece.piece_type)
+            if sprite:
+                piece_size = self.board.cell_size - 10
+                scaled_sprite = pygame.transform.scale(sprite, (piece_size, piece_size))
+                if self.dragging_piece.color == Color.BLACK:
+                    tinted_sprite = scaled_sprite.copy()
+                    dark_overlay = pygame.Surface((piece_size, piece_size))
+                    dark_overlay.set_alpha(100)
+                    dark_overlay.fill((100, 50, 50))
+                    tinted_sprite.blit(dark_overlay, (0, 0))
+                    scaled_sprite = tinted_sprite
+                screen.blit(scaled_sprite, (self.drag_offset_x - piece_size // 2, self.drag_offset_y - piece_size // 2))
+            else:
+                symbol = self.get_piece_symbol(self.dragging_piece.piece_type)
+                font = pygame.font.Font(None, 36)
+                text_color = (255, 255, 255) if self.dragging_piece.color == Color.WHITE else (150, 50, 50)
+                text = font.render(symbol, True, text_color)
+                text_rect = text.get_rect(center=(self.drag_offset_x, self.drag_offset_y))
+                screen.blit(text, text_rect)
         
         # Draw UI elements
         self.draw_tft_ui(screen)
@@ -895,21 +942,44 @@ class TFTGame:
         
     def draw_pieces_with_images(self, screen: pygame.Surface):
         """Draw pieces using loaded images"""
+        import math
+        time_ms = pygame.time.get_ticks()
+        float_offset = int(6 * math.sin(time_ms / 250.0))  # 6px up/down, smooth
+
+        # If combat animation is active, skip drawing attacker/defender pieces here
+        anim_attacker = None
+        anim_defender = None
+        if self.combat_anim:
+            anim_attacker = self.combat_anim["attacker"]
+            anim_defender = self.combat_anim["defender"]
+
         for row in range(8):
             for col in range(8):
                 piece = self.board.grid[row][col]
                 if piece is not None and piece.is_alive():
+                    # Skip attacker/defender during animation
+                    if piece is anim_attacker or piece is anim_defender:
+                        continue
+
                     x = self.board.board_offset_x + col * self.board.cell_size
                     y = self.board.board_offset_y + row * self.board.cell_size
-                    
+
+                    # Apply floating animation if selected
+                    is_selected = (
+                        self.selected_piece is piece
+                        and self.selected_row == row
+                        and self.selected_col == col
+                    )
+                    y_anim = y + float_offset if is_selected else y
+
                     # Get the sprite for this piece type
                     sprite = self.piece_sprites.get(piece.piece_type)
-                    
+
                     if sprite:
                         # Scale sprite to fit cell
                         piece_size = self.board.cell_size - 10
                         scaled_sprite = pygame.transform.scale(sprite, (piece_size, piece_size))
-                        
+
                         # Apply color tint for different players
                         if piece.color == Color.BLACK:
                             # Create a dark tinted version for black pieces
@@ -919,37 +989,116 @@ class TFTGame:
                             dark_overlay.fill((100, 50, 50))  # Dark red tint
                             tinted_sprite.blit(dark_overlay, (0, 0))
                             scaled_sprite = tinted_sprite
-                        
+
                         # Draw the piece
-                        screen.blit(scaled_sprite, (x + 5, y + 5))
-                        
+                        screen.blit(scaled_sprite, (x + 5, y_anim + 5))
+
                         # Draw piece border to distinguish colors better
                         border_color = (255, 255, 255) if piece.color == Color.WHITE else (150, 50, 50)
-                        pygame.draw.rect(screen, border_color, (x + 3, y + 3, piece_size + 4, piece_size + 4), 2)
-                        
+                        pygame.draw.rect(screen, border_color, (x + 3, y_anim + 3, piece_size + 4, piece_size + 4), 2)
+
                     else:
                         # Fallback to text rendering if image not available
                         symbol = self.get_piece_symbol(piece.piece_type)
                         font = pygame.font.Font(None, 36)
                         text_color = (255, 255, 255) if piece.color == Color.WHITE else (150, 50, 50)
                         text = font.render(symbol, True, text_color)
-                        text_rect = text.get_rect(center=(x + self.board.cell_size // 2, y + self.board.cell_size // 2))
+                        text_rect = text.get_rect(center=(x + self.board.cell_size // 2, y_anim + self.board.cell_size // 2))
                         screen.blit(text, text_rect)
-                    
+
                     # Draw HP bar above piece if damaged
                     if piece.hp < piece.max_hp:
                         bar_width = self.board.cell_size - 20
                         bar_height = 6
                         bar_x = x + 10
-                        bar_y = y - 10
-                        
+                        bar_y = y_anim - 10
+
                         # Background bar (red)
                         pygame.draw.rect(screen, (200, 50, 50), (bar_x, bar_y, bar_width, bar_height))
-                        
+
                         # Health bar (green)
                         health_ratio = piece.hp / piece.max_hp
                         health_width = int(bar_width * health_ratio)
                         pygame.draw.rect(screen, (50, 200, 50), (bar_x, bar_y, health_width, bar_height))
-                        
+
                         # Bar border
                         pygame.draw.rect(screen, (255, 255, 255), (bar_x, bar_y, bar_width, bar_height), 1)
+
+    def draw_combat_animation(self, screen: pygame.Surface, anim: dict):
+        """Draw modular combat animation for attacker and defender"""
+        import math
+        attacker = anim["attacker"]
+        defender = anim["defender"]
+        attacker_row, attacker_col = anim["attacker_pos"]
+        defender_row, defender_col = anim["defender_pos"]
+        elapsed = pygame.time.get_ticks() - anim["start_time"]
+        duration = 600
+
+        # Get positions
+        ax = self.board.board_offset_x + attacker_col * self.board.cell_size
+        ay = self.board.board_offset_y + attacker_row * self.board.cell_size
+        dx = self.board.board_offset_x + defender_col * self.board.cell_size
+        dy = self.board.board_offset_y + defender_row * self.board.cell_size
+
+        # Animation: attacker moves toward defender, defender shakes
+        progress = min(elapsed / duration, 1.0)
+        # Modular: different piece types can have different effects
+        if attacker.piece_type == PieceType.KNIGHT:
+            # Knight: jump attack
+            jump = int(-18 * math.sin(math.pi * progress))
+            ax_anim = ax + int((dx - ax) * progress * 0.7)
+            ay_anim = ay + int((dy - ay) * progress * 0.7) + jump
+        elif attacker.piece_type == PieceType.ROOK:
+            # Rook: slide attack
+            ax_anim = ax + int((dx - ax) * progress * 0.8)
+            ay_anim = ay + int((dy - ay) * progress * 0.8)
+        elif attacker.piece_type == PieceType.BISHOP:
+            # Bishop: diagonal slide
+            ax_anim = ax + int((dx - ax) * progress * 0.8)
+            ay_anim = ay + int((dy - ay) * progress * 0.8)
+        elif attacker.piece_type == PieceType.QUEEN:
+            # Queen: fast dash
+            ax_anim = ax + int((dx - ax) * progress)
+            ay_anim = ay + int((dy - ay) * progress)
+        elif attacker.piece_type == PieceType.KING:
+            # King: slow, powerful move
+            ax_anim = ax + int((dx - ax) * progress * 0.5)
+            ay_anim = ay + int((dy - ay) * progress * 0.5)
+        else:
+            # Pawn: simple step
+            ax_anim = ax + int((dx - ax) * progress * 0.6)
+            ay_anim = ay + int((dy - ay) * progress * 0.6)
+
+        # Defender shake effect
+        shake = int(6 * math.sin(progress * 8 * math.pi)) if progress > 0.7 else 0
+
+        # Draw attacker
+        sprite_a = self.piece_sprites.get(attacker.piece_type)
+        if sprite_a:
+            piece_size = self.board.cell_size - 10
+            scaled_sprite = pygame.transform.scale(sprite_a, (piece_size, piece_size))
+            if attacker.color == Color.BLACK:
+                tinted_sprite = scaled_sprite.copy()
+                dark_overlay = pygame.Surface((piece_size, piece_size))
+                dark_overlay.set_alpha(100)
+                dark_overlay.fill((100, 50, 50))
+                tinted_sprite.blit(dark_overlay, (0, 0))
+                scaled_sprite = tinted_sprite
+            screen.blit(scaled_sprite, (ax_anim + 5, ay_anim + 5))
+            border_color = (255, 255, 255) if attacker.color == Color.WHITE else (150, 50, 50)
+            pygame.draw.rect(screen, border_color, (ax_anim + 3, ay_anim + 3, piece_size + 4, piece_size + 4), 2)
+        # Draw defender
+        sprite_d = self.piece_sprites.get(defender.piece_type)
+        if sprite_d:
+            piece_size = self.board.cell_size - 10
+            scaled_sprite = pygame.transform.scale(sprite_d, (piece_size, piece_size))
+            if defender.color == Color.BLACK:
+                tinted_sprite = scaled_sprite.copy()
+                dark_overlay = pygame.Surface((piece_size, piece_size))
+                dark_overlay.set_alpha(100)
+                dark_overlay.fill((100, 50, 50))
+                tinted_sprite.blit(dark_overlay, (0, 0))
+                scaled_sprite = tinted_sprite
+            screen.blit(scaled_sprite, (dx + 5 + shake, dy + 5))
+            border_color = (255, 255, 255) if defender.color == Color.WHITE else (150, 50, 50)
+            pygame.draw.rect(screen, border_color, (dx + 3 + shake, dy + 3, piece_size + 4, piece_size + 4), 2)
