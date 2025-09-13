@@ -80,8 +80,8 @@ def draw_phase_controls(screen: pygame.Surface, game: TFTGame):
     # Controls based on phase
     if game.phase == GamePhase.SHOP or game.phase == GamePhase.SETUP:
         controls = [
-            "🛒 Click shop items to buy pieces with coins",
-            "🎯 Click pieces on board to select and move",
+            "🛒 Shop open: Click items to buy with coins" if game.shop_open else "🔒 Shop closed: Prepare for battle",
+            "🎯 Click empty board positions to deploy pieces from reserve",
             "🚀 Press B to start battle phase",
             "🔄 R = reset, ESC = quit"
         ]

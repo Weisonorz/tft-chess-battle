@@ -36,6 +36,12 @@ class TFTGame:
         self.shop_open = True  # Shop starts open
         self.battle_ended = False
         
+        # Drag and drop state
+        self.dragging_piece = None
+        self.dragging_from_reserve = False
+        self.drag_offset_x = 0
+        self.drag_offset_y = 0
+        
         # UI elements
         self.font = None
         self.title_font = None
@@ -310,14 +316,105 @@ class TFTGame:
             self.buy_piece(self.current_player, shop_index)
                 
     def handle_reserve_click(self, mouse_x: int, mouse_y: int, player: Color):
-        """Handle clicks on reserve area"""
-        # For now, just select pieces - deployment will be handled separately
-        pass
+        """Handle clicks on reserve area for deployment"""
+        if self.phase not in [GamePhase.SETUP, GamePhase.SHOP]:
+            return
+            
+        reserve = self.white_reserve if player == Color.WHITE else self.black_reserve
+        area = self.white_reserve_area if player == Color.WHITE else self.black_reserve_area
+        
+        # Calculate which piece was clicked
+        relative_x = mouse_x - area.x
+        relative_y = mouse_y - area.y
+        
+        if relative_y < 25:  # Clicked on title area
+            return
+            
+        # Vertical layout for reserves
+        pieces_per_row = 2
+        slot_width = 60
+        slot_height = 55
+        
+        adjusted_y = relative_y - 25
+        if adjusted_y < 0:
+            return
+            
+        col = relative_x // slot_width
+        row = adjusted_y // slot_height
+        
+        if col >= pieces_per_row:
+            return
+            
+        piece_index = row * pieces_per_row + col
+        
+        if 0 <= piece_index < len(reserve):
+            piece = reserve[piece_index]
+            self.add_to_log(f"Selected {piece.piece_type.value.title()} from reserve - drag to board to deploy!")
+            return piece_index
+        
+        return None
+        
+    def handle_deployment_click(self, mouse_x: int, mouse_y: int):
+        """Handle deployment of pieces from reserve to board during setup"""
+        row, col = self.board.get_cell_from_mouse(mouse_x, mouse_y)
+        
+        if not self.board.is_valid_position(row, col):
+            return
+            
+        # Check if position is empty
+        if self.board.get_piece_at(row, col) is not None:
+            self.add_to_log("Position is occupied!")
+            return
+            
+        # Show deployment options for current player
+        player = self.current_player
+        reserve = self.white_reserve if player == Color.WHITE else self.black_reserve
+        
+        if not reserve:
+            self.add_to_log(f"No pieces in {player.value.title()} reserve to deploy!")
+            return
+            
+        # For simplicity, deploy the first piece in reserve (can be enhanced to show selection UI)
+        if self.try_deploy_to_position(player, 0, row, col):
+            self.add_to_log(f"{player.value.title()} deployed piece to {chr(ord('a')+col)}{8-row}")
+        
+    def try_deploy_to_position(self, player: Color, reserve_index: int, row: int, col: int) -> bool:
+        """Try to deploy a piece from reserve to a specific board position"""
+        reserve = self.white_reserve if player == Color.WHITE else self.black_reserve
+        
+        if not (0 <= reserve_index < len(reserve)):
+            return False
+            
+        # Check deployment zones
+        if player == Color.WHITE and not (5 <= row <= 7):
+            self.add_to_log("White can only deploy in rows 6-8 (bottom 3 rows)")
+            return False
+        elif player == Color.BLACK and not (0 <= row <= 2):
+            self.add_to_log("Black can only deploy in rows 1-3 (top 3 rows)")
+            return False
+            
+        # Check if position is empty
+        if self.board.get_piece_at(row, col) is not None:
+            return False
+            
+        # Deploy the piece
+        piece = reserve[reserve_index]
+        piece.row = row
+        piece.col = col
+        self.board.grid[row][col] = piece
+        reserve.remove(piece)
+        
+        return True
         
     def handle_board_click(self, mouse_x: int, mouse_y: int):
         """Handle clicks on the game board"""
-        # Allow movement during BATTLE phase, and also during SETUP for positioning
-        if self.phase not in [GamePhase.BATTLE, GamePhase.SETUP]:
+        # During SETUP/SHOP: handle deployment
+        if self.phase in [GamePhase.SETUP, GamePhase.SHOP]:
+            self.handle_deployment_click(mouse_x, mouse_y)
+            return
+            
+        # Only allow movement during BATTLE phase
+        if self.phase != GamePhase.BATTLE:
             return
             
         row, col = self.board.get_cell_from_mouse(mouse_x, mouse_y)
@@ -506,15 +603,8 @@ class TFTGame:
             mode_surface = self.font.render(mode_text, True, mode_color)
             screen.blit(mode_surface, (350, 40))
         
-        # Draw coins
-        white_coins_text = f"White: {self.white_coins} 🪙"
-        black_coins_text = f"Black: {self.black_coins} 🪙"
-        
-        white_surface = self.font.render(white_coins_text, True, (255, 255, 255))
-        black_surface = self.font.render(black_coins_text, True, (255, 150, 150))
-        
-        screen.blit(white_surface, (700, 50))
-        screen.blit(black_surface, (700, 75))
+        # Draw detailed economic system UI
+        self.draw_economy_panel(screen)
         
         # Draw reserve areas
         self.draw_reserve_area(screen, self.white_reserve_area, self.white_reserve, Color.WHITE)
@@ -528,6 +618,60 @@ class TFTGame:
             
         # Draw battle log (smaller)
         self.draw_battle_log(screen)
+        
+    def draw_economy_panel(self, screen: pygame.Surface):
+        """Draw detailed economic system information"""
+        # Economy panel positioning
+        panel_x = 680
+        panel_y = 40
+        panel_width = 300
+        panel_height = 100
+        
+        # Draw economy panel background
+        economy_rect = pygame.Rect(panel_x, panel_y, panel_width, panel_height)
+        pygame.draw.rect(screen, (30, 40, 60), economy_rect)
+        pygame.draw.rect(screen, (100, 120, 150), economy_rect, 2)
+        
+        # Title
+        title_text = "💰 ECONOMY SYSTEM"
+        title_surface = self.font.render(title_text, True, (255, 215, 100))
+        screen.blit(title_surface, (panel_x + 10, panel_y + 5))
+        
+        # White player economics
+        white_y = panel_y + 30
+        white_coins_text = f"White: {self.white_coins} 🪙"
+        white_reserve_text = f"Reserve: {len(self.white_reserve)}/8"
+        white_army_value = sum(self.get_piece_cost(p.piece_type) for p in self.white_reserve)
+        white_value_text = f"Army Value: {white_army_value} 🪙"
+        
+        white_coins_surface = self.small_font.render(white_coins_text, True, (255, 255, 255))
+        white_reserve_surface = self.small_font.render(white_reserve_text, True, (200, 200, 200))
+        white_value_surface = self.small_font.render(white_value_text, True, (180, 180, 180))
+        
+        screen.blit(white_coins_surface, (panel_x + 10, white_y))
+        screen.blit(white_reserve_surface, (panel_x + 120, white_y))
+        screen.blit(white_value_surface, (panel_x + 220, white_y))
+        
+        # Black player economics
+        black_y = panel_y + 50
+        black_coins_text = f"Black: {self.black_coins} 🪙"
+        black_reserve_text = f"Reserve: {len(self.black_reserve)}/8"
+        black_army_value = sum(self.get_piece_cost(p.piece_type) for p in self.black_reserve)
+        black_value_text = f"Army Value: {black_army_value} 🪙"
+        
+        black_coins_surface = self.small_font.render(black_coins_text, True, (255, 150, 150))
+        black_reserve_surface = self.small_font.render(black_reserve_text, True, (200, 150, 150))
+        black_value_surface = self.small_font.render(black_value_text, True, (180, 150, 150))
+        
+        screen.blit(black_coins_surface, (panel_x + 10, black_y))
+        screen.blit(black_reserve_surface, (panel_x + 120, black_y))
+        screen.blit(black_value_surface, (panel_x + 220, black_y))
+        
+        # Economic info
+        eco_y = panel_y + 75
+        income_text = f"Round Income: +1 🪙 | Kill Reward: +½ cost | Win Bonus: +3 🪙"
+        income_surface = self.small_font.render(income_text, True, (150, 200, 150))
+        screen.blit(income_surface, (panel_x + 10, eco_y))
         
     def draw_reserve_area(self, screen: pygame.Surface, area: pygame.Rect, reserve: List[Piece], player: Color):
         """Draw reserve area for a player"""
