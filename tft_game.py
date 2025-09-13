@@ -649,6 +649,9 @@ class TFTGame:
         # Draw pieces with custom rendering using loaded images
         self.draw_pieces_with_images(screen)
 
+        # Draw hover window for piece info
+        # (Removed duplicate rendering; now only drawn at the end of draw())
+
         # Combat animation rendering
         if self.combat_anim:
             self.draw_combat_animation(screen, self.combat_anim)
@@ -693,6 +696,75 @@ class TFTGame:
         
         # Draw UI elements
         self.draw_tft_ui(screen)
+        
+        # Draw battle mode feedback
+        if self.phase == GamePhase.BATTLE:
+            banner_rect = pygame.Rect(0, 0, self.screen_width, 38)
+            pygame.draw.rect(screen, (255, 80, 80), banner_rect)
+            banner_text = self.title_font.render("⚔️ BATTLE MODE ⚔️", True, (255, 255, 255))
+            screen.blit(banner_text, (self.screen_width // 2 - banner_text.get_width() // 2, 4))
+
+        # --- Draw hover window for piece info (always on top) ---
+        mouse_x, mouse_y = pygame.mouse.get_pos()
+        # Board hover
+        hovered_piece = None
+        for row in range(8):
+            for col in range(8):
+                piece = self.board.grid[row][col]
+                if piece and piece.is_alive():
+                    px = self.board.board_offset_x + col * self.board.cell_size
+                    py = self.board.board_offset_y + row * self.board.cell_size
+                    rect = pygame.Rect(px, py, self.board.cell_size, self.board.cell_size)
+                    if rect.collidepoint(mouse_x, mouse_y):
+                        hovered_piece = piece
+                        break
+            if hovered_piece:
+                break
+        # Shop hover
+        hovered_shop_piece = None
+        if self.shop_open:
+            for i in range(len(self.shop_items)):
+                x = self.shop_area.x + 12
+                y = self.shop_area.y + 48 + i * 65
+                item_width, item_height = self.shop_area.width - 24, 56
+                rect = pygame.Rect(x, y, item_width, item_height)
+                if rect.collidepoint(mouse_x, mouse_y):
+                    hovered_shop_piece = self.shop_items[i]
+                    break
+        # Draw hover window (shop takes priority)
+        info_width, info_height = 180, 110
+        info_x = min(max(mouse_x + 20, 10), self.screen_width - info_width - 10)
+        info_y = min(max(mouse_y + 20, 10), self.screen_height - info_height - 10)
+        if hovered_shop_piece:
+            piece = hovered_shop_piece
+            info_rect = pygame.Rect(info_x, info_y, info_width, info_height)
+            pygame.draw.rect(screen, (30, 30, 50), info_rect)
+            pygame.draw.rect(screen, (100, 255, 180), info_rect, 2)
+            font = pygame.font.Font("Hackathon_image/pixel_font.ttf", 22)
+            title = f"{piece.piece_type.value.title()[:12]}"
+            hp = f"HP: {piece.hp}/{piece.max_hp}"
+            atk = f"ATK: {piece.attack}"
+            cost = f"Cost: {piece.cost}"
+            pos = "Shop Item"
+            lines = [title, hp, atk, cost, pos]
+            for i, line in enumerate(lines):
+                text = font.render(line[:22], True, (255, 255, 255))
+                screen.blit(text, (info_x + 12, info_y + 12 + i * 20))
+        elif hovered_piece:
+            piece = hovered_piece
+            info_rect = pygame.Rect(info_x, info_y, info_width, info_height)
+            pygame.draw.rect(screen, (30, 30, 50), info_rect)
+            pygame.draw.rect(screen, (100, 255, 180), info_rect, 2)
+            font = pygame.font.Font("Hackathon_image/pixel_font.ttf", 22)
+            title = f"{piece.color.value.title()} {piece.piece_type.value.title()}"
+            hp = f"HP: {piece.hp}/{piece.max_hp}"
+            atk = f"ATK: {piece.attack}"
+            cost = f"Cost: {piece.cost}"
+            pos = f"Pos: {chr(ord('a')+piece.col)}{8-piece.row}"
+            lines = [title, hp, atk, cost, pos]
+            for i, line in enumerate(lines):
+                text = font.render(line[:22], True, (255, 255, 255))
+                screen.blit(text, (info_x + 12, info_y + 12 + i * 20))
         
     def draw_tft_ui(self, screen: pygame.Surface):
         """Draw TFT-specific UI elements"""
@@ -948,6 +1020,36 @@ class TFTGame:
                     overlay = pygame.Surface((item_width, item_height), pygame.SRCALPHA)
                     overlay.fill((255, 0, 0, 120))
                     screen.blit(overlay, (x, y))
+
+        # Hover window for shop piece info
+        mouse_x, mouse_y = pygame.mouse.get_pos()
+        hovered_index = None
+        for i in range(len(self.shop_items)):
+            x = self.shop_area.x + 12
+            y = self.shop_area.y + 48 + i * 65
+            item_width, item_height = self.shop_area.width - 24, 56
+            rect = pygame.Rect(x, y, item_width, item_height)
+            if rect.collidepoint(mouse_x, mouse_y):
+                hovered_index = i
+                break
+        if hovered_index is not None:
+            piece = self.shop_items[hovered_index]
+            info_width, info_height = 180, 110
+            info_x = min(max(mouse_x + 20, 10), self.screen_width - info_width - 10)
+            info_y = min(max(mouse_y + 20, 10), self.screen_height - info_height - 10)
+            info_rect = pygame.Rect(info_x, info_y, info_width, info_height)
+            pygame.draw.rect(screen, (30, 30, 50), info_rect)
+            pygame.draw.rect(screen, (100, 255, 180), info_rect, 2)
+            font = pygame.font.Font("Hackathon_image/pixel_font.ttf", 22)
+            title = f"{piece.piece_type.value.title()[:12]}"
+            hp = f"HP: {piece.hp}/{piece.max_hp}"
+            atk = f"ATK: {piece.attack}"
+            cost = f"Cost: {piece.cost}"
+            pos = "Shop Item"
+            lines = [title, hp, atk, cost, pos]
+            for i, line in enumerate(lines):
+                text = font.render(line[:22], True, (255, 255, 255))
+                screen.blit(text, (info_x + 12, info_y + 12 + i * 20))
             
     def draw_shop_closed(self, screen: pygame.Surface):
         """Draw shop closed message"""
