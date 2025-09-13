@@ -6,9 +6,9 @@ class Board:
     def __init__(self):
         self.grid = [[None for _ in range(8)] for _ in range(8)]
         self.board_sprite = None
-        self.cell_size = 80
-        self.board_offset_x = 200
-        self.board_offset_y = 120
+        self.cell_size = 90  # Larger board cells
+        self.board_offset_x = 250  # More space from left
+        self.board_offset_y = 150  # More space from top
         self.border_width = 20
         self.setup_initial_pieces()
         

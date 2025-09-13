@@ -6,9 +6,9 @@ def main():
     # Initialize Pygame
     pygame.init()
     
-    # Set up the display - optimized for new UI layout
-    SCREEN_WIDTH = 1000
-    SCREEN_HEIGHT = 870
+    # Set up the display - larger window with better spacing
+    SCREEN_WIDTH = 1400
+    SCREEN_HEIGHT = 1000
     screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
     pygame.display.set_caption("🏰 TFT Chess Battle ⚔️")
     
@@ -38,7 +38,7 @@ def main():
                 if event.key == pygame.K_SPACE and game.selected_piece and game.phase == GamePhase.BATTLE:
                     # Toggle action mode during battle
                     game.toggle_action_mode()
-                elif event.key == pygame.K_b and game.phase == GamePhase.SETUP:
+                elif event.key == pygame.K_b and game.phase in [GamePhase.SETUP, GamePhase.SHOP]:
                     # Start battle phase
                     game.start_battle_phase()
                 elif event.key == pygame.K_n and game.phase == GamePhase.END_ROUND:
@@ -73,7 +73,7 @@ def draw_phase_controls(screen: pygame.Surface, game: TFTGame):
     """Draw context-sensitive controls"""
     font = pygame.font.Font(None, 20)
     
-    controls_area = pygame.Rect(50, 850, 900, 20)
+    controls_area = pygame.Rect(50, 950, 1300, 25)
     pygame.draw.rect(screen, (30, 30, 50), controls_area)
     pygame.draw.rect(screen, (100, 100, 120), controls_area, 2)
     
@@ -102,11 +102,11 @@ def draw_phase_controls(screen: pygame.Surface, game: TFTGame):
     else:
         controls = ["🎮 Use keyboard shortcuts to control the game"]
     
-    # Draw controls in a single line
-    small_font = pygame.font.Font(None, 14)
+    # Draw controls in a single line with larger font
+    control_font = pygame.font.Font(None, 18)
     all_controls = " | ".join(controls)
-    text = small_font.render(all_controls, True, (200, 200, 200))
-    screen.blit(text, (controls_area.x + 5, controls_area.y + 3))
+    text = control_font.render(all_controls, True, (200, 200, 200))
+    screen.blit(text, (controls_area.x + 5, controls_area.y + 5))
 
 if __name__ == "__main__":
     main()

@@ -50,17 +50,17 @@ class TFTGame:
         self.setup_initial_board()
         self.generate_shop()
         
-        # UI layout - completely redesigned to avoid board blocking
-        # Board is at (200, 120) with size 640x640 (8*80)
-        self.white_reserve_area = pygame.Rect(50, 120, 130, 500)   # Left side of board
-        self.black_reserve_area = pygame.Rect(860, 120, 130, 300)  # Right side of board, top
-        self.shop_area = pygame.Rect(860, 440, 130, 300)           # Right side of board, bottom
+        # UI layout - redesigned with larger spacing and no board blocking
+        # Board is now at (250, 150) with size 720x720 (8*90)
+        self.white_reserve_area = pygame.Rect(50, 150, 180, 600)   # Left side - wider with more space
+        self.black_reserve_area = pygame.Rect(1000, 150, 180, 350)  # Right side top - wider  
+        self.shop_area = pygame.Rect(1200, 150, 180, 400)           # Far right - wider
         
     def load_assets(self):
         pygame.font.init()
-        self.font = pygame.font.Font(None, 24)
-        self.title_font = pygame.font.Font(None, 32)
-        self.small_font = pygame.font.Font(None, 18)
+        self.font = pygame.font.Font(None, 28)        # Larger main font
+        self.title_font = pygame.font.Font(None, 40)  # Larger title font
+        self.small_font = pygame.font.Font(None, 22)  # Larger small font
         
         # Load piece sprites from Hackathon_image directory
         self.piece_sprites = {}
@@ -298,18 +298,11 @@ class TFTGame:
         relative_x = mouse_x - self.shop_area.x
         relative_y = mouse_y - self.shop_area.y
         
-        items_per_row = 1 if self.shop_area.width < 200 else 5
-        
-        if items_per_row == 1:  # Vertical layout
-            if relative_y >= 40:  # Below title
-                shop_index = (relative_y - 40) // 50
-            else:
-                shop_index = -1
-        else:  # Horizontal layout
-            if 40 <= relative_y <= 120:  # Shop items row
-                shop_index = relative_x // 80
-            else:
-                shop_index = -1
+        # Vertical layout with larger items
+        if relative_y >= 40:  # Below title
+            shop_index = (relative_y - 40) // 65  # Match new item height spacing
+        else:
+            shop_index = -1
                 
         if 0 <= shop_index < len(self.shop_items):
             # Try to buy for current player
@@ -330,16 +323,16 @@ class TFTGame:
         if relative_y < 25:  # Clicked on title area
             return
             
-        # Vertical layout for reserves
-        pieces_per_row = 2
-        slot_width = 60
-        slot_height = 55
+        # Layout for reserves - matches drawing layout
+        pieces_per_row = 3
+        slot_width = 55
+        slot_height = 60
         
-        adjusted_y = relative_y - 25
+        adjusted_y = relative_y - 30  # Match drawing offset
         if adjusted_y < 0:
             return
             
-        col = relative_x // slot_width
+        col = (relative_x - 10) // slot_width  # Account for 10px left margin
         row = adjusted_y // slot_height
         
         if col >= pieces_per_row:
@@ -621,11 +614,11 @@ class TFTGame:
         
     def draw_economy_panel(self, screen: pygame.Surface):
         """Draw detailed economic system information"""
-        # Economy panel positioning
-        panel_x = 680
-        panel_y = 40
-        panel_width = 300
-        panel_height = 100
+        # Economy panel positioning - moved to fit new layout
+        panel_x = 700
+        panel_y = 50
+        panel_width = 400
+        panel_height = 120
         
         # Draw economy panel background
         economy_rect = pygame.Rect(panel_x, panel_y, panel_width, panel_height)
@@ -685,20 +678,15 @@ class TFTGame:
         label_surface = self.small_font.render(label, True, (255, 255, 255))
         screen.blit(label_surface, (area.x + 5, area.y + 5))
         
-        # Draw reserve pieces in vertical layout
-        pieces_per_row = 2 if area.width < 200 else 8  # Vertical layout for narrow areas
+        # Draw reserve pieces in improved layout
+        pieces_per_row = 3  # 3 pieces per row for wider reserve areas
         
         for i, piece in enumerate(reserve[:8]):  # Max 8 in reserve
-            if pieces_per_row == 2:  # Vertical layout
-                col = i % 2
-                row = i // 2
-                x = area.x + 5 + col * 60
-                y = area.y + 25 + row * 55
-                slot_width, slot_height = 55, 50
-            else:  # Horizontal layout
-                x = area.x + 5 + i * 70
-                y = area.y + 20
-                slot_width, slot_height = 60, 40
+            col = i % pieces_per_row
+            row = i // pieces_per_row
+            x = area.x + 10 + col * 55
+            y = area.y + 30 + row * 60
+            slot_width, slot_height = 50, 55
             
             # Draw piece background
             piece_color = (200, 200, 220) if player == Color.WHITE else (220, 150, 150)
@@ -741,18 +729,14 @@ class TFTGame:
         title_surface = self.font.render(shop_title, True, (255, 215, 100))
         screen.blit(title_surface, (self.shop_area.x + 10, self.shop_area.y + 10))
         
-        # Draw shop items in vertical layout for narrow shop
-        items_per_row = 1 if self.shop_area.width < 200 else 5
+        # Draw shop items in vertical layout for wider shop area
+        items_per_row = 1  # Keep vertical for better organization
         
         for i, piece in enumerate(self.shop_items):
-            if items_per_row == 1:  # Vertical layout
-                x = self.shop_area.x + 10
-                y = self.shop_area.y + 40 + i * 50
-                item_width, item_height = self.shop_area.width - 20, 45
-            else:  # Horizontal layout
-                x = self.shop_area.x + 10 + i * 80
-                y = self.shop_area.y + 40
-                item_width, item_height = 70, 80
+            # Vertical layout with larger items
+            x = self.shop_area.x + 10
+            y = self.shop_area.y + 40 + i * 65
+            item_width, item_height = self.shop_area.width - 20, 60
             
             # Draw item background
             cost = self.get_piece_cost(piece.piece_type)
@@ -770,28 +754,21 @@ class TFTGame:
             # Draw piece image or symbol
             sprite = self.piece_sprites.get(piece.piece_type)
             if sprite:
-                # Scale to fit shop slot
-                sprite_size = min(item_height - 10, 35)
+                # Scale to fit shop slot - larger sprite
+                sprite_size = min(item_height - 10, 45)
                 shop_sprite = pygame.transform.scale(sprite, (sprite_size, sprite_size))
-                sprite_x = x + 5
+                sprite_x = x + 10
                 sprite_y = y + (item_height - sprite_size) // 2
                 screen.blit(shop_sprite, (sprite_x, sprite_y))
                 
-                # Draw piece name and cost next to image (for vertical layout)
-                if items_per_row == 1:
-                    name_text = piece.piece_type.value.title()
-                    name_surface = self.small_font.render(name_text, True, (255, 255, 255))
-                    screen.blit(name_surface, (x + sprite_size + 10, y + 5))
-                    
-                    cost_text = f"{cost}🪙"
-                    cost_surface = self.small_font.render(cost_text, True, (255, 255, 100))
-                    screen.blit(cost_surface, (x + sprite_size + 10, y + 25))
-                else:
-                    # Horizontal layout - cost below
-                    cost_text = f"{cost}🪙"
-                    cost_surface = self.small_font.render(cost_text, True, (255, 255, 100))
-                    cost_x = x + item_width // 2 - cost_surface.get_width() // 2
-                    screen.blit(cost_surface, (cost_x, y + item_height - 20))
+                # Draw piece name and cost next to image
+                name_text = piece.piece_type.value.title()
+                name_surface = self.small_font.render(name_text, True, (255, 255, 255))
+                screen.blit(name_surface, (x + sprite_size + 20, y + 10))
+                
+                cost_text = f"{cost}🪙"
+                cost_surface = self.small_font.render(cost_text, True, (255, 255, 100))
+                screen.blit(cost_surface, (x + sprite_size + 20, y + 35))
             else:
                 # Fallback to symbol
                 symbol = self.get_piece_symbol(piece.piece_type)
@@ -823,7 +800,7 @@ class TFTGame:
         
     def draw_battle_log(self, screen: pygame.Surface):
         """Draw battle log at bottom of screen"""
-        log_area = pygame.Rect(200, 770, 640, 80)  # Bottom of screen, aligned with board width
+        log_area = pygame.Rect(250, 880, 720, 100)  # Bottom of screen, aligned with board width
         pygame.draw.rect(screen, (25, 25, 40), log_area)
         pygame.draw.rect(screen, (80, 80, 100), log_area, 2)
         
