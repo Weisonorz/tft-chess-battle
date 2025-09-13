@@ -28,8 +28,14 @@ class Card:
             for row in range(8):
                 for col in range(8):
                     piece = game.board.grid[row][col]
-                    if piece and piece.is_alive():
+                    if piece and piece.is_alive() and piece.color != player:
                         piece.hp = max(0, piece.hp - 1)
-            game.add_to_log(f"{player.value.title()} used Arrow Volley! All units take 1 damage.")
+            # Remove dead pieces from board
+            for row in range(8):
+                for col in range(8):
+                    piece = game.board.grid[row][col]
+                    if piece and not piece.is_alive():
+                        game.board.grid[row][col] = None
+            game.add_to_log(f"{player.value.title()} used Arrow Volley! Enemy units take 1 damage.")
         # Disarm is stored, effect applied later via inventory UI
         # Add more card effects here as needed
